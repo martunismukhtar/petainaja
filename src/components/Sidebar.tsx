@@ -27,7 +27,7 @@ import type { GisLayer, ClickedFeatureInfo, CustomPin } from "../types";
 
 interface SidebarProps {
   layers: GisLayer[];
-  onToggleLayer: (id: LayerId) => void;
+  onToggleLayer: (id: LayerId | string) => void;
   clickedFeature: ClickedFeatureInfo | null;
   onCloseFeatureInfo: () => void;
   customPins: CustomPin[];
@@ -38,13 +38,14 @@ interface SidebarProps {
   onToggleUploadedVisibility: () => void;
   onClearUploaded: () => void;
   onClose?: () => void;
-  onUpdateLayerColor: (id: LayerId, color: string) => void;
-  onUpdateLayerOpacity: (id: LayerId, opacity: number) => void;
-  onUpdateLayerIconStyle: (id: LayerId, iconStyle: "circle" | "square" | "star" | "triangle" | "marker") => void;
-  onUpdateLayerLineStyle: (id: LayerId, lineStyle: "solid" | "dashed" | "dotted") => void;
-  onUpdateLayerLineWidth: (id: LayerId, lineWidth: number) => void;
-  onOpenAttributeTable: (id: LayerId) => void;
-  onExportLayer: (id: LayerId, format: "shp" | "kml" | "geojson") => void;
+  onUpdateLayerColor: (id: LayerId | string, color: string) => void;
+  onUpdateLayerOpacity: (id: LayerId | string, opacity: number) => void;
+  onUpdateLayerIconStyle: (id: LayerId | string, iconStyle: "circle" | "square" | "star" | "triangle" | "marker") => void;
+  onUpdateLayerLineStyle: (id: LayerId | string, lineStyle: "solid" | "dashed" | "dotted") => void;
+  onUpdateLayerLineWidth: (id: LayerId | string, lineWidth: number) => void;
+  onOpenAttributeTable: (id: LayerId | string) => void;
+  onExportLayer: (id: LayerId | string, format: "shp" | "kml" | "geojson") => void;
+  onRemoveLayer?: (id: LayerId | string) => void;
 }
 
 export default function Sidebar({
@@ -66,10 +67,11 @@ export default function Sidebar({
   onUpdateLayerLineStyle,
   onUpdateLayerLineWidth,
   onOpenAttributeTable,
-  onExportLayer
+  onExportLayer,
+  onRemoveLayer
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeLayerConfigId, setActiveLayerConfigId] = useState<LayerId | null>(null);
+  const [activeLayerConfigId, setActiveLayerConfigId] = useState<LayerId | string | null>(null);
   const [expandedSection, setExpandedSection] = useState<Record<string, boolean>>({
     layers: true,
     featureInfo: true,
@@ -194,6 +196,21 @@ export default function Sidebar({
                       >
                         <Settings2 className="w-3.5 h-3.5" />
                       </button>
+
+                      {/* Custom Uploaded Layer Trash Button */}
+                      {layer.isUploaded && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Apakah Anda yakin ingin menghapus layer "${layer.name}"?`)) {
+                              onRemoveLayer?.(layer.id);
+                            }
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded border border-transparent transition-colors"
+                          title="Hapus Layer Kustom"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
 
                       {/* Visual color indicator */}
                       <span

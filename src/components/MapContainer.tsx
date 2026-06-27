@@ -202,6 +202,37 @@ export default function MapContainer({
     const map = mapRef.current;
     if (!map || !isMapLoaded) return;
 
+    // Clean up removed custom layers first
+    try {
+      const style = map.getStyle();
+      if (style) {
+        style.layers.forEach((mapL) => {
+          if (mapL.id.startsWith("custom-layer-")) {
+            const remainder = mapL.id.replace("custom-layer-outline-", "").replace("custom-layer-", "");
+            const layerStillExists = layers.some((l) => l.id === remainder);
+            if (!layerStillExists) {
+              if (map.getLayer(mapL.id)) {
+                map.removeLayer(mapL.id);
+              }
+            }
+          }
+        });
+        Object.keys(style.sources).forEach((sourceKey) => {
+          if (sourceKey.startsWith("custom-source-")) {
+            const remainder = sourceKey.replace("custom-source-", "");
+            const layerStillExists = layers.some((l) => l.id === remainder);
+            if (!layerStillExists) {
+              if (map.getSource(sourceKey)) {
+                map.removeSource(sourceKey);
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.error("Error cleaning up custom layers:", e);
+    }
+
     layers.forEach((layer) => {
       const isVisible = layer.visible;
       const visibilityValue = isVisible ? "visible" : "none";
@@ -276,8 +307,122 @@ export default function MapContainer({
           }
         });
       }
+
+      // Dynamic Uploaded Custom Layers
+      if (layer.isUploaded) {
+        const sourceId = `custom-source-${layer.id}`;
+        const mainLayerId = `custom-layer-${layer.id}`;
+        const outlineLayerId = `custom-layer-outline-${layer.id}`;
+
+        // Ensure Source and Layer are initialized on the map if they do not exist
+        if (layer.geojson && !map.getSource(sourceId)) {
+          map.addSource(sourceId, {
+            type: "geojson",
+            data: layer.geojson
+          });
+
+          if (layer.type === "fill") {
+            map.addLayer({
+              id: mainLayerId,
+              type: "fill",
+              source: sourceId,
+              paint: {
+                "fill-color": layer.color,
+                "fill-opacity": layer.opacity
+              }
+            });
+            map.addLayer({
+              id: outlineLayerId,
+              type: "line",
+              source: sourceId,
+              paint: {
+                "line-color": layer.color,
+                "line-opacity": layer.opacity + 0.2 > 1 ? 1 : layer.opacity + 0.2,
+                "line-width": 1.5
+              }
+            });
+          } else if (layer.type === "line") {
+            map.addLayer({
+              id: mainLayerId,
+              type: "line",
+              source: sourceId,
+              paint: {
+                "line-color": layer.color,
+                "line-opacity": layer.opacity,
+                "line-width": layer.lineWidth || 3
+              }
+            });
+          } else {
+            // Circle/Point layer
+            map.addLayer({
+              id: mainLayerId,
+              type: "circle",
+              source: sourceId,
+              paint: {
+                "circle-color": layer.color,
+                "circle-opacity": layer.opacity,
+                "circle-radius": 6,
+                "circle-stroke-color": "#ffffff",
+                "circle-stroke-width": 1
+              }
+            });
+          }
+
+          // Feature click listener for attributes table popup support on click
+          map.on("click", mainLayerId, (e) => {
+            const features = map.queryRenderedFeatures(e.point, { layers: [mainLayerId] });
+            if (features.length > 0) {
+              const feat = features[0];
+              onFeatureClick({
+                layerId: layer.id,
+                layerName: layer.name,
+                properties: feat.properties || {},
+                coordinates: e.lngLat.toArray() as [number, number]
+              });
+            }
+          });
+
+          // Change cursor on hover
+          map.on("mouseenter", mainLayerId, () => {
+            map.getCanvas().style.cursor = "pointer";
+          });
+          map.on("mouseleave", mainLayerId, () => {
+            map.getCanvas().style.cursor = "";
+          });
+        }
+
+        // Apply dynamic styles & visibility updates
+        if (map.getLayer(mainLayerId)) {
+          map.setLayoutProperty(mainLayerId, "visibility", visibilityValue);
+          if (layer.type === "fill") {
+            map.setPaintProperty(mainLayerId, "fill-color", layer.color);
+            map.setPaintProperty(mainLayerId, "fill-opacity", layer.opacity);
+            if (map.getLayer(outlineLayerId)) {
+              map.setLayoutProperty(outlineLayerId, "visibility", visibilityValue);
+              map.setPaintProperty(outlineLayerId, "line-color", layer.color);
+              map.setPaintProperty(outlineLayerId, "line-opacity", layer.opacity + 0.2 > 1 ? 1 : layer.opacity + 0.2);
+            }
+          } else if (layer.type === "line") {
+            map.setPaintProperty(mainLayerId, "line-color", layer.color);
+            map.setPaintProperty(mainLayerId, "line-opacity", layer.opacity);
+            map.setPaintProperty(mainLayerId, "line-width", layer.lineWidth || 3);
+            
+            if (layer.lineStyle === "dashed") {
+              map.setPaintProperty(mainLayerId, "line-dasharray", [4, 3]);
+            } else if (layer.lineStyle === "dotted") {
+              map.setPaintProperty(mainLayerId, "line-dasharray", [1, 2]);
+            } else {
+              map.setPaintProperty(mainLayerId, "line-dasharray", null);
+            }
+          } else {
+            // Circle type
+            map.setPaintProperty(mainLayerId, "circle-color", layer.color);
+            map.setPaintProperty(mainLayerId, "circle-opacity", layer.opacity);
+          }
+        }
+      }
     });
-  }, [layers, isMapLoaded]);
+  }, [layers, isMapLoaded, onFeatureClick]);
 
   // --- 5. RENDER LANDMARK HTML MARKERS ---
   const renderLandmarkMarkers = () => {

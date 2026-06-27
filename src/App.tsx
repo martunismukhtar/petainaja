@@ -41,6 +41,7 @@ import {
   geojsonToWktCsv,
   downloadFile
 } from "./utils/exportUtils";
+import { validateAndParseShapefileZip } from "./utils/shapefileParser";
 
 const INITIAL_LAYERS: GisLayer[] = [
   {
@@ -133,7 +134,7 @@ export default function App() {
 
   // UI Control Modals
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
-  const [attributeTableLayerId, setAttributeTableLayerId] = useState<LayerId | null>(null);
+  const [attributeTableLayerId, setAttributeTableLayerId] = useState<LayerId | string | null>(null);
   const [attributeSearchQuery, setAttributeSearchQuery] = useState<string>("");
 
   // File Input Ref
@@ -142,42 +143,52 @@ export default function App() {
   // --- ACTIONS & HANDLERS ---
 
   // --- LAYER STYLING & ACTIONS CALLBACKS ---
-  const handleUpdateLayerColor = (id: LayerId, color: string) => {
+  const handleUpdateLayerColor = (id: LayerId | string, color: string) => {
     setLayers((prev) =>
       prev.map((l) => (l.id === id ? { ...l, color } : l))
     );
   };
 
-  const handleUpdateLayerOpacity = (id: LayerId, opacity: number) => {
+  const handleUpdateLayerOpacity = (id: LayerId | string, opacity: number) => {
     setLayers((prev) =>
       prev.map((l) => (l.id === id ? { ...l, opacity } : l))
     );
   };
 
-  const handleUpdateLayerIconStyle = (id: LayerId, iconStyle: "circle" | "square" | "star" | "triangle" | "marker") => {
+  const handleUpdateLayerIconStyle = (id: LayerId | string, iconStyle: "circle" | "square" | "star" | "triangle" | "marker") => {
     setLayers((prev) =>
       prev.map((l) => (l.id === id ? { ...l, iconStyle } : l))
     );
   };
 
-  const handleUpdateLayerLineStyle = (id: LayerId, lineStyle: "solid" | "dashed" | "dotted") => {
+  const handleUpdateLayerLineStyle = (id: LayerId | string, lineStyle: "solid" | "dashed" | "dotted") => {
     setLayers((prev) =>
       prev.map((l) => (l.id === id ? { ...l, lineStyle } : l))
     );
   };
 
-  const handleUpdateLayerLineWidth = (id: LayerId, lineWidth: number) => {
+  const handleUpdateLayerLineWidth = (id: LayerId | string, lineWidth: number) => {
     setLayers((prev) =>
       prev.map((l) => (l.id === id ? { ...l, lineWidth } : l))
     );
   };
 
-  const handleOpenAttributeTable = (id: LayerId) => {
+  const handleOpenAttributeTable = (id: LayerId | string) => {
     setAttributeTableLayerId(id);
     setAttributeSearchQuery("");
   };
 
-  const handleExportLayer = (id: LayerId, format: "shp" | "kml" | "geojson") => {
+  const handleRemoveLayer = (id: LayerId | string) => {
+    setLayers((prev) => prev.filter((l) => l.id !== id));
+    setUploadedGeoJSONs((prev, index) => {
+      // Clean up the corresponding uploadedGeoJSON if we find it
+      const layerIndex = layers.findIndex((l) => l.id === id);
+      const isUploadedCount = layers.filter((l, idx) => l.isUploaded && idx < layerIndex).length;
+      return prev.filter((_, idx) => idx !== isUploadedCount);
+    });
+  };
+
+  const handleExportLayer = (id: LayerId | string, format: "shp" | "kml" | "geojson") => {
     // Get corresponding data
     let geojson: any = null;
     let name = "layer";
@@ -194,6 +205,12 @@ export default function App() {
     } else if (id === LayerId.LANDMARK) {
       geojson = LANDMARK_DATA;
       name = "Landmarks_Aceh";
+    } else {
+      const customL = layers.find((l) => l.id === id);
+      if (customL && customL.isUploaded) {
+        geojson = customL.geojson;
+        name = customL.name.replace(/\s+/g, "_");
+      }
     }
 
     if (!geojson) {
@@ -218,7 +235,7 @@ export default function App() {
   };
 
   // Layer toggle handler
-  const handleToggleLayer = (id: LayerId) => {
+  const handleToggleLayer = (id: LayerId | string) => {
     setLayers((prev) =>
       prev.map((layer) =>
         layer.id === id ? { ...layer, visible: !layer.visible } : layer
@@ -285,31 +302,133 @@ export default function App() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
+    const fileNameLower = file.name.toLowerCase();
+
+    if (fileNameLower.endsWith(".zip")) {
       try {
-        const json = JSON.parse(event.target?.result as string);
-        if (json.type === "FeatureCollection") {
-          setUploadedGeoJSONs((prev) => [...prev, json]);
+        const geojson = await validateAndParseShapefileZip(file);
+        if (geojson && geojson.type === "FeatureCollection") {
+          // Determine geometry type
+          let layerType: "fill" | "line" | "circle" = "fill";
+          const firstFeature = geojson.features?.[0];
+          if (firstFeature && firstFeature.geometry) {
+            const geomType = firstFeature.geometry.type;
+            if (geomType.includes("Polygon")) {
+              layerType = "fill";
+            } else if (geomType.includes("LineString")) {
+              layerType = "line";
+            } else if (geomType.includes("Point")) {
+              layerType = "circle";
+            }
+          }
+
+          const newLayerId = `uploaded-${Date.now()}`;
+          const newLayer: GisLayer = {
+            id: newLayerId,
+            name: file.name.replace(/\.[^/.]+$/, ""),
+            visible: true,
+            type: layerType,
+            color: layerType === "fill" ? "#10b981" : layerType === "line" ? "#f59e0b" : "#3b82f6",
+            opacity: layerType === "fill" ? 0.35 : 0.85,
+            description: `ZIP Shapefile: ${file.name}`,
+            count: geojson.features?.length || 0,
+            isUploaded: true,
+            geojson: geojson
+          };
+
+          setLayers((prev) => [...prev, newLayer]);
+          setUploadedGeoJSONs((prev) => [...prev, geojson]);
           setIsUploadedVisible(true);
+
           alert(
-            `Berhasil memuat dataset GeoJSON: "${file.name}"\n` +
-              `Jumlah Fitur: ${json.features?.length || 0} entitas.`
+            `Berhasil memuat ZIP Shapefile: "${file.name}"\n` +
+              `Nama Layer Baru: "${newLayer.name}"\n` +
+              `Jumlah Fitur: ${newLayer.count} entitas.`
           );
+
+          // Fly to first coordinate
+          if (firstFeature) {
+            const coords = getFeatureCenter(firstFeature);
+            if (coords) {
+              handleZoomToPin(coords);
+            }
+          }
         } else {
           alert(
-            "Format file tidak didukung! File harus berupa GeoJSON valid yang bertipe 'FeatureCollection'."
+            "Format file tidak didukung atau kosong! ZIP wajib berisi file bertipe .shp, .shx, .dbf, dan .prj yang valid."
           );
         }
-      } catch (err) {
-        alert("Gagal membaca file! Pastikan file adalah JSON yang valid.");
+      } catch (err: any) {
+        alert(`Gagal memuat Shapefile dari ZIP: ${err.message || err}`);
       }
-    };
-    reader.readAsText(file);
+    } else if (fileNameLower.endsWith(".geojson") || fileNameLower.endsWith(".json")) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const json = JSON.parse(event.target?.result as string);
+          if (json.type === "FeatureCollection") {
+            // Determine geometry type
+            let layerType: "fill" | "line" | "circle" = "fill";
+            const firstFeature = json.features?.[0];
+            if (firstFeature && firstFeature.geometry) {
+              const geomType = firstFeature.geometry.type;
+              if (geomType.includes("Polygon")) {
+                layerType = "fill";
+              } else if (geomType.includes("LineString")) {
+                layerType = "line";
+              } else if (geomType.includes("Point")) {
+                layerType = "circle";
+              }
+            }
+
+            const newLayerId = `uploaded-${Date.now()}`;
+            const newLayer: GisLayer = {
+              id: newLayerId,
+              name: file.name.replace(/\.[^/.]+$/, ""),
+              visible: true,
+              type: layerType,
+              color: layerType === "fill" ? "#3b82f6" : layerType === "line" ? "#10b981" : "#f59e0b",
+              opacity: layerType === "fill" ? 0.35 : 0.85,
+              description: `GeoJSON: ${file.name}`,
+              count: json.features?.length || 0,
+              isUploaded: true,
+              geojson: json
+            };
+
+            setLayers((prev) => [...prev, newLayer]);
+            setUploadedGeoJSONs((prev) => [...prev, json]);
+            setIsUploadedVisible(true);
+
+            alert(
+              `Berhasil memuat dataset GeoJSON: "${file.name}"\n` +
+                `Nama Layer Baru: "${newLayer.name}"\n` +
+                `Jumlah Fitur: ${newLayer.count} entitas.`
+            );
+
+            // Fly to first coordinate
+            if (firstFeature) {
+              const coords = getFeatureCenter(firstFeature);
+              if (coords) {
+                handleZoomToPin(coords);
+              }
+            }
+          } else {
+            alert(
+              "Format file tidak didukung! File harus berupa GeoJSON valid yang bertipe 'FeatureCollection'."
+            );
+          }
+        } catch (err) {
+          alert("Gagal membaca file! Pastikan file adalah JSON yang valid.");
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      alert("Format file tidak didukung! Pilih file .geojson, .json, atau .zip (Shapefile).");
+    }
 
     // Reset input so upload can trigger again for same file name
     e.target.value = "";
@@ -318,6 +437,7 @@ export default function App() {
   const handleClearUploaded = () => {
     setUploadedGeoJSONs([]);
     setIsUploadedVisible(false);
+    setLayers((prev) => prev.filter((l) => !l.isUploaded));
   };
 
   // Aggregate total geographic features loaded
@@ -379,6 +499,29 @@ export default function App() {
         { key: "category", label: "Kategori" },
         { key: "description", label: "Keterangan" }
       ];
+    } else {
+      const customL = layers.find((l) => l.id === attributeTableLayerId);
+      if (customL && customL.isUploaded && customL.geojson) {
+        geojson = customL.geojson;
+        name = customL.name;
+        
+        // Auto-extract column headers based on keys in properties
+        const keys = new Set<string>();
+        geojson.features?.forEach((f: any) => {
+          if (f.properties) {
+            Object.keys(f.properties).forEach((k) => keys.add(k));
+          }
+        });
+        
+        if (keys.size === 0) {
+          cols = [{ key: "id", label: "ID Fitur" }];
+        } else {
+          cols = Array.from(keys).map((k) => ({
+            key: k,
+            label: k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, " ")
+          }));
+        }
+      }
     }
 
     const features = geojson ? geojson.features : [];
@@ -414,7 +557,7 @@ export default function App() {
       <input
         type="file"
         ref={fileInputRef}
-        accept=".geojson,application/json"
+        accept=".geojson,.json,.zip,application/json,application/zip,application/x-zip-compressed"
         onChange={handleFileChange}
         className="hidden"
       />
@@ -458,6 +601,7 @@ export default function App() {
             onUpdateLayerLineWidth={handleUpdateLayerLineWidth}
             onOpenAttributeTable={handleOpenAttributeTable}
             onExportLayer={handleExportLayer}
+            onRemoveLayer={handleRemoveLayer}
           />
         )}
 

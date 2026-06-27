@@ -12,10 +12,12 @@
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@tailwindcss/vite": "^4.3.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^1.21.0",
     "maplibre-gl": "^5.24.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "shpjs": "^6.2.0",
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
@@ -23,6 +25,7 @@
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/shpjs": "^3.4.7",
     "@vitejs/plugin-react": "^6.0.2",
     "oxlint": "^1.69.0",
     "typescript": "~6.0.2",

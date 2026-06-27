@@ -9,6 +9,7 @@ import {
   MapPin,
   Compass,
   FileUp,
+  FolderArchive,
   Ruler,
   Maximize2,
   Radio,
@@ -271,17 +272,30 @@ export default function Header({
             )}
           </button>
           {activeDropdown === "add-data" && (
-            <div className="absolute left-0 top-[56px] w-60 bg-[#0f172a] border border-[#334155] rounded-b-lg shadow-2xl py-1.5 animate-in fade-in duration-100">
-              <button
-                onClick={() => handleMenuAction(onTriggerFileUpload)}
-                className="w-full text-left px-4 py-2.5 hover:bg-[#1e293b] flex items-center gap-2.5 text-slate-300 hover:text-white text-xs"
-              >
-                <FileUp className="w-4 h-4 text-[#38bdf8]" />
-                <div>
-                  <p className="font-medium">Upload File GeoJSON</p>
-                  <p className="text-[9px] text-slate-500 font-mono">Format .geojson / .json</p>
-                </div>
-              </button>
+            <div className="absolute left-0 top-[56px] w-64 bg-[#0f172a] border border-[#334155] rounded-b-lg shadow-2xl py-1.5 animate-in fade-in duration-100 divide-y divide-[#334155]/20">
+              <div className="py-1">
+                <button
+                  onClick={() => handleMenuAction(onTriggerFileUpload)}
+                  className="w-full text-left px-4 py-2.5 hover:bg-[#1e293b] flex items-center gap-2.5 text-slate-300 hover:text-white text-xs"
+                >
+                  <FileUp className="w-4 h-4 text-[#38bdf8]" />
+                  <div>
+                    <p className="font-medium">Upload File GeoJSON</p>
+                    <p className="text-[9px] text-slate-500 font-mono">Format .geojson / .json</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleMenuAction(onTriggerFileUpload)}
+                  className="w-full text-left px-4 py-2.5 hover:bg-[#1e293b] flex items-center gap-2.5 text-slate-300 hover:text-white text-xs"
+                >
+                  <FolderArchive className="w-4 h-4 text-emerald-400" />
+                  <div>
+                    <p className="font-medium">Upload Shapefile (.ZIP)</p>
+                    <p className="text-[9px] text-slate-400 font-mono">Wajib ada .shp, .shx, .dbf, .prj</p>
+                  </div>
+                </button>
+              </div>
+              <div className="py-1">
               <button
                 onClick={() => handleMenuAction(() => onChangeTool(activeTool === "add-custom-pin" ? "none" : "add-custom-pin"))}
                 className={`w-full text-left px-4 py-2.5 hover:bg-[#1e293b] flex items-center gap-2.5 text-xs ${
@@ -296,6 +310,7 @@ export default function Header({
                   </p>
                 </div>
               </button>
+              </div>
             </div>
           )}
         </div>

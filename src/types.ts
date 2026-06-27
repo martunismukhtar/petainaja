@@ -6,7 +6,7 @@ export enum LayerId {
 }
 
 export interface GisLayer {
-  id: LayerId;
+  id: LayerId | string;
   name: string;
   visible: boolean;
   type: "fill" | "line" | "circle";
@@ -18,9 +18,12 @@ export interface GisLayer {
   iconStyle?: "circle" | "square" | "star" | "triangle" | "marker";
   lineStyle?: "solid" | "dashed" | "dotted";
   lineWidth?: number;
+  isUploaded?: boolean;
+  geojson?: any;
 }
 
 export interface ClickedFeatureInfo {
+  layerId?: LayerId | string;
   layerName: string;
   properties: Record<string, any>;
   coordinates: [number, number];
