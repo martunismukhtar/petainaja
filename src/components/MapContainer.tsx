@@ -29,7 +29,11 @@ import {
   Trash2,
   Navigation,
   Plus,
-  Minus
+  Minus,
+  Printer,
+  Download,
+  Compass,
+  X
 } from "lucide-react";
 
 // Basemap JSON Style URL Map
@@ -110,6 +114,15 @@ export default function MapContainer({
   // Map pitch/bearing for 3D navigation
   const [is3DMode, setIs3DMode] = useState(false);
 
+  // Print & Layout States
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printTitle, setPrintTitle] = useState("PETA SPASIAL KOTA BANDA ACEH");
+  const [printSubtitle, setPrintSubtitle] = useState("Badan Perencanaan Pembangunan Daerah Kota Banda Aceh");
+  const [printPaperSize, setPrintPaperSize] = useState<"A4" | "A3">("A4");
+  const [printOrientation, setPrintOrientation] = useState<"landscape" | "portrait">("landscape");
+  const [capturedMapUrl, setCapturedMapUrl] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+
   // Ref to always reference the freshest state variables inside the map event closures
   const stateRef = useRef({
     drawingLayerId,
@@ -142,8 +155,9 @@ export default function MapContainer({
       center: BANDA_ACEH_CENTER,
       zoom: 13,
       pitch: 0,
-      bearing: 0
-    });
+      bearing: 0,
+      preserveDrawingBuffer: true
+    } as any);
 
     // Build Mini Map (Synchronized static overview)
     const miniMap = new maplibregl.Map({
@@ -1170,6 +1184,45 @@ export default function MapContainer({
     setPinDialogCoords(null);
   };
 
+  // Capture map and open print/export dialog
+  const handleCaptureMap = () => {
+    setIsCapturing(true);
+    const map = mapRef.current;
+    if (!map) {
+      setIsCapturing(false);
+      return;
+    }
+
+    try {
+      const canvas = map.getCanvas();
+      const dataUrl = canvas.toDataURL("image/png");
+      setCapturedMapUrl(dataUrl);
+      setPrintDialogOpen(true);
+    } catch (err) {
+      console.error("Gagal menangkap kanvas peta:", err);
+      alert("Gagal menangkap gambar peta. Silakan gerakkan atau geser peta sedikit, lalu coba lagi.");
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  // Download raw captured map image as PNG
+  const handleDownloadMapPNG = () => {
+    if (!capturedMapUrl) return;
+    const link = document.createElement("a");
+    link.download = `peta_banda_aceh_${new Date().toISOString().slice(0, 10)}.png`;
+    link.href = capturedMapUrl;
+    link.click();
+  };
+
+  const isPortrait = printOrientation === "portrait";
+  const paperWidth = printPaperSize === "A4" 
+    ? (isPortrait ? "210mm" : "297mm") 
+    : (isPortrait ? "297mm" : "420mm");
+  const paperHeight = printPaperSize === "A4" 
+    ? (isPortrait ? "297mm" : "210mm") 
+    : (isPortrait ? "420mm" : "594mm");
+
   // Camera 3D controls toggle
   const handleToggle3D = () => {
     const map = mapRef.current;
@@ -1211,6 +1264,16 @@ export default function MapContainer({
 
       {/* Map Control Buttons (Layer Pitch, Zoom) */}
       <div className="absolute top-4 right-4 flex flex-col gap-2 z-30">
+        <button
+          onClick={handleCaptureMap}
+          disabled={isCapturing}
+          className="p-2.5 rounded-lg border shadow-lg font-sans text-xs flex items-center justify-center gap-1.5 transition-all bg-[#0f172a] border-[#334155] text-slate-300 hover:bg-[#1e293b] hover:text-white disabled:opacity-50 cursor-pointer"
+          title="Cetak dan Ekspor Tata Letak Peta (Kop Kartografi)"
+        >
+          <Printer className="w-4 h-4 text-[#38bdf8]" />
+          <span className="font-bold text-[11px]">CETAK PETA</span>
+        </button>
+
         <button
           onClick={handleToggle3D}
           className={`p-2.5 rounded-lg border shadow-lg font-sans text-xs flex items-center justify-center gap-1.5 transition-all ${
@@ -1662,6 +1725,384 @@ export default function MapContainer({
           </div>
         );
       })()}
+
+      {/* 6. PRINT AND EXPORT MAP LAYOUT MODAL */}
+      {printDialogOpen && capturedMapUrl && (
+        <div className="fixed inset-0 bg-slate-950/98 z-50 flex flex-col md:flex-row p-4 gap-4 overflow-y-auto animate-in fade-in duration-300">
+          {/* Print Style Injector */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media print {
+              /* Hide everything else on the page */
+              body, html, #root {
+                background: white !important;
+                color: black !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                overflow: visible !important;
+              }
+              body * {
+                visibility: hidden !important;
+              }
+              #print-layout-paper, #print-layout-paper * {
+                visibility: visible !important;
+              }
+              #print-layout-paper {
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: ${paperWidth} !important;
+                height: ${paperHeight} !important;
+                margin: 0 !important;
+                padding: 1.2cm !important;
+                box-shadow: none !important;
+                border: 4px double black !important;
+                background-color: white !important;
+                color: black !important;
+                z-index: 9999999 !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+              }
+              @page {
+                size: ${printPaperSize.toLowerCase()} ${printOrientation.toLowerCase()};
+                margin: 0;
+              }
+            }
+          `}} />
+
+          {/* Left panel: Control settings */}
+          <div className="w-full md:w-80 bg-[#0f172a] border border-[#334155] rounded-xl p-4 flex flex-col gap-4 text-slate-200 shrink-0 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-[#334155] pb-2">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-[#38bdf8]" />
+                <h3 className="font-bold text-sm tracking-wide text-slate-100 font-mono">LAYOUT CETAK</h3>
+              </div>
+              <button
+                onClick={() => setPrintDialogOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800/80 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Title options */}
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Judul Utama Peta
+                </label>
+                <input
+                  type="text"
+                  value={printTitle}
+                  onChange={(e) => setPrintTitle(e.target.value)}
+                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                  placeholder="Contoh: PETA KERAWANAN BANJIR"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Sub-Judul / Instansi
+                </label>
+                <input
+                  type="text"
+                  value={printSubtitle}
+                  onChange={(e) => setPrintSubtitle(e.target.value)}
+                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                  placeholder="Contoh: Bappeda Kota Banda Aceh"
+                />
+              </div>
+
+              {/* Paper size selection */}
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Ukuran Kertas
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                  <button
+                    onClick={() => setPrintPaperSize("A4")}
+                    className={`py-1.5 rounded border transition-all cursor-pointer ${
+                      printPaperSize === "A4"
+                        ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
+                        : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Kertas A4
+                  </button>
+                  <button
+                    onClick={() => setPrintPaperSize("A3")}
+                    className={`py-1.5 rounded border transition-all cursor-pointer ${
+                      printPaperSize === "A3"
+                        ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
+                        : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Kertas A3 (Besar)
+                  </button>
+                </div>
+              </div>
+
+              {/* Orientation selection */}
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Orientasi Halaman
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                  <button
+                    onClick={() => setPrintOrientation("landscape")}
+                    className={`py-1.5 rounded border transition-all cursor-pointer ${
+                      printOrientation === "landscape"
+                        ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
+                        : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Landscape
+                  </button>
+                  <button
+                    onClick={() => setPrintOrientation("portrait")}
+                    className={`py-1.5 rounded border transition-all cursor-pointer ${
+                      printOrientation === "portrait"
+                        ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
+                        : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Portrait
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Control buttons */}
+            <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-[#334155]">
+              <button
+                onClick={() => window.print()}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-900/20"
+              >
+                <Printer className="w-4 h-4" />
+                Cetak ke PDF / Printer
+              </button>
+
+              <button
+                onClick={handleDownloadMapPNG}
+                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-[#334155] font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-emerald-400" />
+                Unduh Gambar Peta (PNG)
+              </button>
+
+              <button
+                onClick={() => setPrintDialogOpen(false)}
+                className="w-full py-2 bg-[#1e293b] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-transparent font-bold font-mono rounded-lg text-xs transition-all cursor-pointer"
+              >
+                Kembali ke Aplikasi
+              </button>
+            </div>
+          </div>
+
+          {/* Right panel: Layout Preview Frame */}
+          <div className="flex-1 flex justify-center items-center p-4 bg-slate-900 border border-[#334155] rounded-xl overflow-hidden min-h-[500px]">
+            <div className="w-full max-w-4xl max-h-[85vh] overflow-auto flex items-center justify-center p-4 scrollbar-thin">
+              {/* This mimics the paper. Handled nicely with aspect ratio constraints */}
+              <div
+                id="print-layout-paper"
+                className={`bg-white text-black p-6 border-4 border-double border-black shadow-2xl flex ${
+                  printOrientation === "portrait" ? "flex-col" : "flex-row"
+                } gap-4 w-full ${
+                  printOrientation === "landscape" ? "aspect-[1.414]" : "aspect-[0.707]"
+                }`}
+                style={{
+                  maxHeight: "80vh",
+                  width: "100%",
+                  boxSizing: "border-box"
+                }}
+              >
+                {/* A. MAP FRAME SECTION */}
+                <div className="flex-[3] border-2 border-black relative flex items-center justify-center overflow-hidden bg-slate-50">
+                  <img
+                    src={capturedMapUrl}
+                    alt="Peta Spasial"
+                    className="w-full h-full object-cover"
+                  />
+                  
+                  {/* Grid or Scale ticks overlay inside map frame for decoration */}
+                  <div className="absolute top-2 left-2 bg-white/80 border border-black px-1.5 py-0.5 text-[8px] font-mono font-bold tracking-tight rounded pointer-events-none select-none text-black">
+                    SISTEM PROYEKSI: UTM ZONE 46N
+                  </div>
+                  <div className="absolute bottom-2 right-2 bg-white/80 border border-black px-2 py-1 text-[9px] font-mono font-bold rounded pointer-events-none select-none text-black">
+                    Skala: Grafis Terlampir
+                  </div>
+                </div>
+
+                {/* B. KOP KARTOGRAFI SECTION (Title block & legend) */}
+                {printOrientation === "landscape" ? (
+                  /* Vertical Kop Layout for Landscape Orientation */
+                  <div className="flex-[1] border-2 border-black p-3.5 flex flex-col justify-between text-black bg-white select-none overflow-hidden max-w-[280px]">
+                    <div className="flex flex-col gap-2.5">
+                      {/* Logo & Agency Info */}
+                      <div className="text-center border-b-2 border-black pb-2 flex flex-col items-center justify-center gap-1">
+                        <div className="w-9 h-9 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-xs">
+                          SIG
+                        </div>
+                        <div className="leading-tight">
+                          <h4 className="font-sans font-extrabold text-[9px] tracking-wider">PEMERINTAH KOTA</h4>
+                          <h4 className="font-sans font-extrabold text-[10px] tracking-wider uppercase">BANDA ACEH</h4>
+                          <p className="text-[7px] text-slate-600 font-medium font-mono leading-none mt-0.5">Provinsi Aceh, Indonesia</p>
+                        </div>
+                      </div>
+
+                      {/* Map Title & Subtitle block */}
+                      <div className="border-b-2 border-black pb-2">
+                        <h2 className="font-sans font-extrabold text-xs tracking-wide uppercase leading-tight text-center">
+                          {printTitle || "PETA SPASIAL KOTA"}
+                        </h2>
+                        <p className="text-[8px] font-mono mt-1 text-center font-medium leading-normal text-slate-700">
+                          {printSubtitle || "Badan Perencanaan Pembangunan Daerah"}
+                        </p>
+                      </div>
+
+                      {/* Compass Block */}
+                      <div className="border-b-2 border-black pb-2.5 flex justify-center items-center gap-4 py-1">
+                        <div className="flex flex-col items-center">
+                          <Compass className="w-8 h-8 text-black" />
+                          <span className="text-[7px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
+                        </div>
+                        <div className="text-left font-mono leading-normal text-[8px]">
+                          <div>Sistem Grid: Geografis</div>
+                          <div>Spheroid: WGS 84</div>
+                          <div>Zona Proyeksi: 46N</div>
+                        </div>
+                      </div>
+
+                      {/* Dynamic Legend Block */}
+                      <div className="flex flex-col gap-1.5">
+                        <h5 className="font-bold text-[9px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">LEGENDA PETA</h5>
+                        <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
+                          {/* Standard Layers */}
+                          <div className="flex items-center gap-2 text-[9px]">
+                            <div className="w-4 h-2.5 border border-black bg-emerald-500/10" />
+                            <span className="font-mono text-[8px] leading-tight">Batas Administrasi Kecamatan</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[9px]">
+                            <div className="w-4 h-0.5 bg-red-500" />
+                            <span className="font-mono text-[8px] leading-tight">Jaringan Jalan Utama</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[9px]">
+                            <div className="w-4 h-0.5 bg-blue-500" />
+                            <span className="font-mono text-[8px] leading-tight">Hidrologi Aliran Sungai</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[9px]">
+                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black" />
+                            <span className="font-mono text-[8px] leading-tight">Titik Landmark & Fasilitas</span>
+                          </div>
+
+                          {/* Dynamic Active Layers from Application */}
+                          {layers.filter(l => l.visible).map((l) => (
+                            <div key={l.id} className="flex items-center gap-2 text-[9px]">
+                              {l.type === "fill" && (
+                                <div className="w-4 h-2.5 border border-black" style={{ backgroundColor: l.color || "#94a3b8" }} />
+                              )}
+                              {l.type === "line" && (
+                                <div className="w-4 h-0.5" style={{ backgroundColor: l.color || "#ef4444" }} />
+                              )}
+                              {l.type === "circle" && (
+                                <div className="w-2.5 h-2.5 rounded-full border border-black" style={{ backgroundColor: l.color || "#3b82f6" }} />
+                              )}
+                              <span className="font-mono text-[8px] truncate leading-tight capitalize">{l.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer metadata block */}
+                    <div className="border-t-2 border-black pt-2 text-[7px] font-mono text-slate-500 flex flex-col gap-0.5">
+                      <div>Pembuat: Portal SIG Web Banda Aceh</div>
+                      <div>Tanggal Cetak: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                      <div className="font-bold text-[6px] tracking-wider uppercase border-t border-slate-200 mt-1 pt-0.5">KARTOGRAFER INDONESIA</div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Horizontal Kop Layout for Portrait Orientation */
+                  <div className="border-2 border-black p-3 flex flex-row justify-between gap-4 text-black bg-white select-none text-left">
+                    {/* Col 1: Logo, Title & Subtitle */}
+                    <div className="flex-1 flex flex-col gap-1.5 pr-2 border-r border-slate-300">
+                      <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
+                        <div className="w-7 h-7 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-[10px]">
+                          SIG
+                        </div>
+                        <div className="leading-tight">
+                          <h4 className="font-sans font-extrabold text-[8px] uppercase tracking-wider leading-none">PEMERINTAH KOTA</h4>
+                          <h4 className="font-sans font-extrabold text-[9px] uppercase tracking-wider leading-tight">BANDA ACEH</h4>
+                        </div>
+                      </div>
+                      <h2 className="font-sans font-extrabold text-[10px] tracking-wide uppercase leading-tight">
+                        {printTitle || "PETA SPASIAL KOTA"}
+                      </h2>
+                      <p className="text-[7px] font-mono leading-tight text-slate-700">
+                        {printSubtitle || "Badan Perencanaan Pembangunan Daerah"}
+                      </p>
+                    </div>
+
+                    {/* Col 2: Legend Panel */}
+                    <div className="flex-1 px-2 border-r border-slate-300 flex flex-col gap-1">
+                      <h5 className="font-bold text-[8px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">LEGENDA</h5>
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 max-h-[70px] overflow-y-auto pr-1">
+                        <div className="flex items-center gap-1 text-[8px]">
+                          <div className="w-3 h-2 border border-black bg-emerald-500/10 shrink-0" />
+                          <span className="font-mono text-[7px] leading-tight truncate">Batas Kecamatan</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[8px]">
+                          <div className="w-3 h-0.5 bg-red-500 shrink-0" />
+                          <span className="font-mono text-[7px] leading-tight truncate">Jalan Kota</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[8px]">
+                          <div className="w-3 h-0.5 bg-blue-500 shrink-0" />
+                          <span className="font-mono text-[7px] leading-tight truncate">Aliran Sungai</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[8px]">
+                          <div className="w-2 h-2 rounded-full bg-amber-500 border border-black shrink-0" />
+                          <span className="font-mono text-[7px] leading-tight truncate">Landmark Kota</span>
+                        </div>
+
+                        {layers.filter(l => l.visible).map((l) => (
+                          <div key={l.id} className="flex items-center gap-1 text-[8px]">
+                            {l.type === "fill" && (
+                              <div className="w-3 h-2 border border-black shrink-0" style={{ backgroundColor: l.color || "#94a3b8" }} />
+                            )}
+                            {l.type === "line" && (
+                              <div className="w-3 h-0.5 shrink-0" style={{ backgroundColor: l.color || "#ef4444" }} />
+                            )}
+                            {l.type === "circle" && (
+                              <div className="w-2 h-2 rounded-full border border-black shrink-0" style={{ backgroundColor: l.color || "#3b82f6" }} />
+                            )}
+                            <span className="font-mono text-[7px] truncate leading-tight capitalize shrink-0">{l.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Col 3: Compass, Scale, Metadata */}
+                    <div className="flex-1 pl-2 flex flex-row items-center justify-between gap-2">
+                      <div className="flex flex-col items-center justify-center shrink-0">
+                        <Compass className="w-7 h-7 text-black" />
+                        <span className="text-[6px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
+                      </div>
+                      <div className="text-[7px] font-mono leading-snug text-slate-600 flex flex-col justify-center min-w-0">
+                        <div className="truncate">Datum: WGS 84 / UTM 46N</div>
+                        <div className="truncate">Sumber: Bappeda Banda Aceh</div>
+                        <div className="truncate font-bold text-[6px] text-black border-t border-slate-200 mt-0.5 pt-0.5">
+                          TGL: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
