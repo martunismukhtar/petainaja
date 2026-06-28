@@ -1093,22 +1093,25 @@ export default function MapContainer({
 
   // Keep map drawing source in sync with React state
   useEffect(() => {
-    if (drawingLayerId) {
-      const targetLayer = layers.find((l) => l.id === drawingLayerId);
-      const layerType = targetLayer?.type || "circle";
-      syncDrawTempSource(drawPoints, layerType, sessionFeatures);
-    } else {
-      setDrawPoints([]);
-      setSessionFeatures([]);
-      const map = mapRef.current;
-      if (map) {
-        const source = map.getSource("draw-temp-source") as maplibregl.GeoJSONSource;
-        if (source) {
-          source.setData({ type: "FeatureCollection", features: [] });
-        }
+    if (!drawingLayerId) return;
+    const targetLayer = layers.find((l) => l.id === drawingLayerId);
+    const layerType = targetLayer?.type || "circle";
+    syncDrawTempSource(drawPoints, layerType, sessionFeatures);
+  }, [drawPoints, sessionFeatures, drawingLayerId, layers]);
+
+  // Reset draw states when drawing is cancelled (drawingLayerId becomes null)
+  useEffect(() => {
+    if (drawingLayerId) return;
+    setDrawPoints([]);
+    setSessionFeatures([]);
+    const map = mapRef.current;
+    if (map) {
+      const source = map.getSource("draw-temp-source") as maplibregl.GeoJSONSource;
+      if (source) {
+        source.setData({ type: "FeatureCollection", features: [] });
       }
     }
-  }, [drawPoints, sessionFeatures, drawingLayerId, layers]);
+  }, [drawingLayerId]);
 
   // Update buffer polygon visual
   const updateBufferLayer = (center: [number, number], rKm: number) => {
@@ -1190,18 +1193,62 @@ export default function MapContainer({
     const map = mapRef.current;
     if (!map) {
       setIsCapturing(false);
+      alert("Peta belum siap. Silakan tunggu hingga peta selesai dimuat.");
       return;
     }
 
+    // Buka modal terlebih dahulu agar user bisa melihat layout settings
+    setPrintDialogOpen(true);
+    setCapturedMapUrl(null);
+
+    // Tunggu map selesai render sebelum menangkap canvas
+    if (map.isStyleLoaded() && !map.isMoving()) {
+      captureCanvas(map);
+    } else {
+      map.once("idle", () => {
+        captureCanvas(map);
+      });
+    }
+  };
+
+  const captureCanvas = (map: maplibregl.Map) => {
     try {
-      const canvas = map.getCanvas();
-      const dataUrl = canvas.toDataURL("image/png");
-      setCapturedMapUrl(dataUrl);
-      setPrintDialogOpen(true);
+      // Force render selesai dengan meminta render frame
+      map.triggerRepaint();
+
+      // Gunakan requestAnimationFrame untuk memastikan WebGL buffer ter-update
+      requestAnimationFrame(() => {
+        try {
+          const canvas = map.getCanvas();
+          if (!canvas) {
+            throw new Error("Canvas peta tidak ditemukan");
+          }
+
+          // Baca pixel pertama untuk memaksa WebGL menyelesaikan rendering ke buffer
+          const gl = canvas.getContext("webgl") || canvas.getContext("webgl2");
+          if (gl) {
+            const pixel = new Uint8Array(4);
+            (gl as WebGLRenderingContext).readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+          }
+
+          const dataUrl = canvas.toDataURL("image/png");
+
+          if (!dataUrl || dataUrl === "data:," || dataUrl.length < 100) {
+            throw new Error("Gambar peta kosong atau tidak valid");
+          }
+
+          setCapturedMapUrl(dataUrl);
+        } catch (innerErr) {
+          console.error("Gagal menangkap kanvas peta:", innerErr);
+          // Set capturedMapUrl tetap null agar modal menampilkan pesan error
+          setCapturedMapUrl(null);
+        } finally {
+          setIsCapturing(false);
+        }
+      });
     } catch (err) {
       console.error("Gagal menangkap kanvas peta:", err);
-      alert("Gagal menangkap gambar peta. Silakan gerakkan atau geser peta sedikit, lalu coba lagi.");
-    } finally {
+      setCapturedMapUrl(null);
       setIsCapturing(false);
     }
   };
@@ -1727,7 +1774,7 @@ export default function MapContainer({
       })()}
 
       {/* 6. PRINT AND EXPORT MAP LAYOUT MODAL */}
-      {printDialogOpen && capturedMapUrl && (
+      {printDialogOpen && (
         <div className="fixed inset-0 bg-slate-950/98 z-50 flex flex-col md:flex-row p-4 gap-4 overflow-y-auto animate-in fade-in duration-300">
           {/* Print Style Injector */}
           <style dangerouslySetInnerHTML={{ __html: `
@@ -1877,7 +1924,8 @@ export default function MapContainer({
             <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-[#334155]">
               <button
                 onClick={() => window.print()}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-900/20"
+                disabled={!capturedMapUrl}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/40 disabled:cursor-not-allowed text-white font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-900/20"
               >
                 <Printer className="w-4 h-4" />
                 Cetak ke PDF / Printer
@@ -1885,9 +1933,10 @@ export default function MapContainer({
 
               <button
                 onClick={handleDownloadMapPNG}
-                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-[#334155] font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                disabled={!capturedMapUrl}
+                className="w-full py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800/40 disabled:cursor-not-allowed text-slate-200 border border-[#334155] font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Download className="w-4 h-4 text-emerald-400" />
+                <Download className={`w-4 h-4 ${capturedMapUrl ? 'text-emerald-400' : 'text-slate-500'}`} />
                 Unduh Gambar Peta (PNG)
               </button>
 
@@ -1919,11 +1968,24 @@ export default function MapContainer({
               >
                 {/* A. MAP FRAME SECTION */}
                 <div className="flex-[3] border-2 border-black relative flex items-center justify-center overflow-hidden bg-slate-50">
-                  <img
-                    src={capturedMapUrl}
-                    alt="Peta Spasial"
-                    className="w-full h-full object-cover"
-                  />
+                  {capturedMapUrl ? (
+                    <img
+                      src={capturedMapUrl}
+                      alt="Peta Spasial"
+                      className="w-full h-full object-cover"
+                      onError={() => {
+                        console.error("Gagal memuat gambar peta yang ditangkap");
+                        setCapturedMapUrl(null);
+                      }}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+                      <div className="w-12 h-12 border-4 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+                      <span className="text-sm font-mono font-bold text-slate-500">
+                        {isCapturing ? "Mengambil gambar peta..." : "Gagal menangkap peta. Silakan tutup dan coba lagi."}
+                      </span>
+                    </div>
+                  )}
                   
                   {/* Grid or Scale ticks overlay inside map frame for decoration */}
                   <div className="absolute top-2 left-2 bg-white/80 border border-black px-1.5 py-0.5 text-[8px] font-mono font-bold tracking-tight rounded pointer-events-none select-none text-black">
