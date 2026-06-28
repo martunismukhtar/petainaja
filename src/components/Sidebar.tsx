@@ -20,7 +20,10 @@ import {
   X,
   Table,
   Download,
-  Palette
+  Palette,
+  Plus,
+  PenTool,
+  Check
 } from "lucide-react";
 import { LayerId } from "../types";
 import type { GisLayer, ClickedFeatureInfo, CustomPin } from "../types";
@@ -46,6 +49,9 @@ interface SidebarProps {
   onOpenAttributeTable: (id: LayerId | string) => void;
   onExportLayer: (id: LayerId | string, format: "shp" | "kml" | "geojson") => void;
   onRemoveLayer?: (id: LayerId | string) => void;
+  onCreateLayer?: (name: string, type: "fill" | "line" | "circle", color: string) => void;
+  drawingLayerId?: string | null;
+  onStartDrawing?: (layerId: string) => void;
 }
 
 export default function Sidebar({
@@ -68,10 +74,25 @@ export default function Sidebar({
   onUpdateLayerLineWidth,
   onOpenAttributeTable,
   onExportLayer,
-  onRemoveLayer
+  onRemoveLayer,
+  onCreateLayer,
+  drawingLayerId,
+  onStartDrawing
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeLayerConfigId, setActiveLayerConfigId] = useState<LayerId | string | null>(null);
+  const [isCreatingLayer, setIsCreatingLayer] = useState(false);
+  const [newLayerName, setNewLayerName] = useState("");
+  const [newLayerType, setNewLayerType] = useState<"fill" | "line" | "circle">("circle");
+  const [newLayerColor, setNewLayerColor] = useState("#10b981");
+
+  const handleCreateLayerSubmit = () => {
+    if (!newLayerName.trim()) return;
+    onCreateLayer?.(newLayerName.trim(), newLayerType, newLayerColor);
+    setNewLayerName("");
+    setIsCreatingLayer(false);
+  };
+
   const [expandedSection, setExpandedSection] = useState<Record<string, boolean>>({
     layers: true,
     featureInfo: true,
@@ -160,6 +181,77 @@ export default function Sidebar({
 
           {expandedSection.layers && (
             <div className="p-2.5 space-y-1 bg-[#1e293b]/25">
+              {/* Create New Custom Layer Form */}
+              <div className="mb-2 px-0.5">
+                {!isCreatingLayer ? (
+                  <button
+                    onClick={() => setIsCreatingLayer(true)}
+                    className="w-full py-1.5 px-3 bg-[#10b981]/10 hover:bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/30 rounded-md flex items-center justify-center gap-1.5 font-bold text-xs transition-all duration-150 shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 animate-pulse" />
+                    Buat Layer Baru
+                  </button>
+                ) : (
+                  <div className="bg-[#0f172a] border border-[#334155]/80 rounded-md p-3 space-y-2.5 animate-in slide-in-from-top-1 duration-150 shadow-md">
+                    <div className="flex justify-between items-center border-b border-[#334155]/60 pb-1.5">
+                      <span className="text-[10px] font-bold uppercase text-[#38bdf8] font-mono">Layer Baru</span>
+                      <button onClick={() => setIsCreatingLayer(false)} className="text-slate-400 hover:text-white text-xs cursor-pointer">✕</button>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Nama Layer</label>
+                        <input
+                          type="text"
+                          placeholder="Contoh: Titik Evakuasi"
+                          value={newLayerName}
+                          onChange={(e) => setNewLayerName(e.target.value)}
+                          className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 focus:outline-none focus:border-[#38bdf8] text-xs font-mono placeholder:text-slate-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Tipe Geometri</label>
+                        <select
+                          value={newLayerType}
+                          onChange={(e) => setNewLayerType(e.target.value as 'fill' | 'line' | 'circle')}
+                          className="w-full bg-[#1e293b] border border-[#334155] rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-[#38bdf8] text-xs cursor-pointer font-mono"
+                        >
+                          <option value="circle">Titik (Point)</option>
+                          <option value="line">Garis (LineString)</option>
+                          <option value="fill">Poligon (Polygon)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Warna Layer</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={newLayerColor}
+                            onChange={(e) => setNewLayerColor(e.target.value)}
+                            className="w-6 h-6 bg-transparent border-0 cursor-pointer p-0 rounded-full"
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono uppercase font-bold">{newLayerColor}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 pt-1">
+                        <button
+                          onClick={handleCreateLayerSubmit}
+                          disabled={!newLayerName.trim()}
+                          className="flex-1 py-1 bg-[#10b981] hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                        >
+                          Buat
+                        </button>
+                        <button
+                          onClick={() => setIsCreatingLayer(false)}
+                          className="px-2 py-1 bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-slate-300 rounded text-[10px] transition-colors cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {filteredLayers.map((layer) => (
                 <div key={layer.id} className="flex flex-col bg-[#1e293b]/20 rounded-md border border-[#334155]/30 overflow-hidden mb-1">
                   <div
@@ -343,6 +435,21 @@ export default function Sidebar({
 
                       {/* Actions: Open Attributes & Export */}
                       <div className="pt-2 border-t border-[#334155]/40 flex flex-col gap-2">
+                        {/* Custom Drawing Button */}
+                        {layer.isUploaded && (
+                          <button
+                            onClick={() => onStartDrawing?.(layer.id)}
+                            className={`w-full py-1.5 px-3 border rounded flex items-center justify-center gap-1.5 font-bold text-xs transition-all duration-150 shadow-sm cursor-pointer ${
+                              drawingLayerId === layer.id
+                                ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/40"
+                                : "bg-[#10b981]/15 hover:bg-[#10b981]/25 text-[#10b981] border-[#10b981]/30"
+                            }`}
+                          >
+                            <PenTool className="w-3.5 h-3.5" />
+                            {drawingLayerId === layer.id ? "Batal Menggambar" : "Gambar Fitur Baru"}
+                          </button>
+                        )}
+
                         {/* Open Attribute Table Button */}
                         <button
                           onClick={() => onOpenAttributeTable(layer.id)}

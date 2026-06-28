@@ -55,6 +55,8 @@ interface MapContainerProps {
   flyToCoords: [number, number] | null;
   onResetFlyTo: () => void;
   uploadedGeoJSONs: any[];
+  drawingLayerId: string | null;
+  onSaveDrawnFeature: (layerId: string, geometry: any, properties?: any) => void;
 }
 
 export default function MapContainer({
@@ -72,7 +74,9 @@ export default function MapContainer({
   setIsMapLoaded,
   flyToCoords,
   onResetFlyTo,
-  uploadedGeoJSONs
+  uploadedGeoJSONs,
+  drawingLayerId,
+  onSaveDrawnFeature
 }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const miniMapContainerRef = useRef<HTMLDivElement>(null);
@@ -89,6 +93,14 @@ export default function MapContainer({
   const [bufferCenter, setBufferCenter] = useState<[number, number] | null>(null);
   const [bufferRadius, setBufferRadius] = useState<number>(1.0); // radius in km
 
+  // Interactive Feature Drawing States
+  const [drawPoints, setDrawPoints] = useState<[number, number][]>([]);
+  const [sessionFeatures, setSessionFeatures] = useState<any[]>([]);
+  const [drawProperties, setDrawProperties] = useState<Record<string, any>>({
+    nama: "Fitur Baru",
+    keterangan: "Dibuat secara interaktif"
+  });
+
   // Dialog state for adding pin
   const [pinDialogCoords, setPinDialogCoords] = useState<[number, number] | null>(null);
   const [newPinName, setNewPinName] = useState("");
@@ -97,6 +109,27 @@ export default function MapContainer({
 
   // Map pitch/bearing for 3D navigation
   const [is3DMode, setIs3DMode] = useState(false);
+
+  // Ref to always reference the freshest state variables inside the map event closures
+  const stateRef = useRef({
+    drawingLayerId,
+    layers,
+    activeTool,
+    bufferRadius,
+    onFeatureClick,
+    sessionFeatures
+  });
+
+  useEffect(() => {
+    stateRef.current = {
+      drawingLayerId,
+      layers,
+      activeTool,
+      bufferRadius,
+      onFeatureClick,
+      sessionFeatures
+    };
+  }, [drawingLayerId, layers, activeTool, bufferRadius, onFeatureClick, sessionFeatures]);
 
   // --- 1. INITIALIZE MAIN & MINI MAP ---
   useEffect(() => {
@@ -389,6 +422,14 @@ export default function MapContainer({
           map.on("mouseleave", mainLayerId, () => {
             map.getCanvas().style.cursor = "";
           });
+        }
+
+        // Sync dynamic GeoJSON source data with main layer state edits or newly drawn shapes
+        if (layer.geojson && map.getSource(sourceId)) {
+          const existingSource = map.getSource(sourceId) as maplibregl.GeoJSONSource;
+          if (existingSource) {
+            existingSource.setData(layer.geojson);
+          }
         }
 
         // Apply dynamic styles & visibility updates
@@ -789,6 +830,55 @@ export default function MapContainer({
       });
     }
 
+    // 6. Temporary GIS Feature Drawing Layer
+    if (!map.getSource("draw-temp-source")) {
+      map.addSource("draw-temp-source", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: []
+        }
+      });
+
+      // Fill layer (for polygons)
+      map.addLayer({
+        id: "draw-temp-fill-layer",
+        type: "fill",
+        source: "draw-temp-source",
+        paint: {
+          "fill-color": "#e11d48",
+          "fill-opacity": 0.3
+        },
+        filter: ["==", "$type", "Polygon"]
+      });
+
+      // Line layer (for line strings and polygon boundaries)
+      map.addLayer({
+        id: "draw-temp-line-layer",
+        type: "line",
+        source: "draw-temp-source",
+        paint: {
+          "line-color": "#e11d48",
+          "line-width": 3,
+          "line-dasharray": [2, 1]
+        },
+        filter: ["in", "$type", "LineString", "Polygon"]
+      });
+
+      // Circle layer (for points and nodes)
+      map.addLayer({
+        id: "draw-temp-circle-layer",
+        type: "circle",
+        source: "draw-temp-source",
+        paint: {
+          "circle-radius": 6,
+          "circle-color": "#e11d48",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff"
+        }
+      });
+    }
+
     // Trigger Initial Markers rendering after WebGL is armed
     renderLandmarkMarkers();
     renderCustomPinMarkers();
@@ -800,15 +890,39 @@ export default function MapContainer({
     if (!map) return;
 
     const clickedCoords: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+    const {
+      drawingLayerId: curDrawingLayerId,
+      layers: curLayers,
+      activeTool: curActiveTool,
+      bufferRadius: curBufferRadius,
+      onFeatureClick: curOnFeatureClick
+    } = stateRef.current;
+
+    // Drawing intercept
+    if (curDrawingLayerId) {
+      const targetLayer = curLayers.find((l) => l.id === curDrawingLayerId);
+      const layerType = targetLayer?.type || "circle";
+      
+      setDrawPoints((prev) => {
+        let updated = [...prev];
+        if (layerType === "circle") {
+          updated = [clickedCoords];
+        } else {
+          updated = [...prev, clickedCoords];
+        }
+        return updated;
+      });
+      return;
+    }
 
     // A. Add custom pin tool
-    if (activeTool === "add-custom-pin") {
+    if (curActiveTool === "add-custom-pin") {
       setPinDialogCoords(clickedCoords);
       return;
     }
 
     // B. Measure distance tool
-    if (activeTool === "measure-distance") {
+    if (curActiveTool === "measure-distance") {
       setMeasurePoints((prev) => {
         const updated = [...prev, clickedCoords];
         updateMeasurementLayer(updated);
@@ -818,9 +932,9 @@ export default function MapContainer({
     }
 
     // C. Spatial buffer generator tool
-    if (activeTool === "buffer-generator") {
+    if (curActiveTool === "buffer-generator") {
       setBufferCenter(clickedCoords);
-      updateBufferLayer(clickedCoords, bufferRadius);
+      updateBufferLayer(clickedCoords, curBufferRadius);
       return;
     }
 
@@ -837,13 +951,13 @@ export default function MapContainer({
       else if (feature.layer?.id === "jalan-layer") layerName = "Infrastruktur Jalan (Line)";
       else if (feature.layer?.id === "sungai-layer") layerName = "Hidrologi Sungai (Line)";
 
-      onFeatureClick({
+      curOnFeatureClick({
         layerName: layerName,
         properties: feature.properties,
         coordinates: clickedCoords
       });
     } else {
-      onFeatureClick(null);
+      curOnFeatureClick(null);
     }
   };
 
@@ -888,6 +1002,99 @@ export default function MapContainer({
       features: features
     });
   };
+
+  // Update dynamic feature drawing visual representation (includes completed session features + currently active path)
+  const syncDrawTempSource = (pts: [number, number][], type: string, completed: any[]) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const source = map.getSource("draw-temp-source") as maplibregl.GeoJSONSource;
+    if (!source) return;
+
+    const features: any[] = [];
+
+    // 1. Add already completed features from this session
+    completed.forEach((f) => {
+      features.push({
+        type: "Feature",
+        properties: f.properties || {},
+        geometry: f.geometry
+      });
+    });
+
+    // 2. Add current active feature being drawn
+    if (type === "fill" && pts.length >= 3) {
+      features.push({
+        type: "Feature",
+        properties: { isTemp: true },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[...pts, pts[0]]]
+        }
+      });
+    }
+
+    if ((type === "line" || type === "fill") && pts.length >= 2) {
+      features.push({
+        type: "Feature",
+        properties: { isTemp: true },
+        geometry: {
+          type: "LineString",
+          coordinates: pts
+        }
+      });
+    }
+
+    // 3. Add point/circle features for all nodes in active shape (or just standard point if type is circle)
+    if (type === "circle") {
+      pts.forEach((pt) => {
+        features.push({
+          type: "Feature",
+          properties: { isTemp: true },
+          geometry: {
+            type: "Point",
+            coordinates: pt
+          }
+        });
+      });
+    } else {
+      // For lines/polygons, draw vertices to assist drawing
+      pts.forEach((pt) => {
+        features.push({
+          type: "Feature",
+          properties: { isTempVertex: true },
+          geometry: {
+            type: "Point",
+            coordinates: pt
+          }
+        });
+      });
+    }
+
+    source.setData({
+      type: "FeatureCollection",
+      features: features
+    });
+  };
+
+  // Keep map drawing source in sync with React state
+  useEffect(() => {
+    if (drawingLayerId) {
+      const targetLayer = layers.find((l) => l.id === drawingLayerId);
+      const layerType = targetLayer?.type || "circle";
+      syncDrawTempSource(drawPoints, layerType, sessionFeatures);
+    } else {
+      setDrawPoints([]);
+      setSessionFeatures([]);
+      const map = mapRef.current;
+      if (map) {
+        const source = map.getSource("draw-temp-source") as maplibregl.GeoJSONSource;
+        if (source) {
+          source.setData({ type: "FeatureCollection", features: [] });
+        }
+      }
+    }
+  }, [drawPoints, sessionFeatures, drawingLayerId, layers]);
 
   // Update buffer polygon visual
   const updateBufferLayer = (center: [number, number], rKm: number) => {
@@ -1243,6 +1450,218 @@ export default function MapContainer({
           </div>
         </div>
       )}
+
+      {/* 5. FLOATING FEATURE DRAWING OVERLAY */}
+      {drawingLayerId && (() => {
+        const targetLayer = layers.find((l) => l.id === drawingLayerId);
+        const layerType = targetLayer?.type || "circle";
+        
+        // Validation for the current active geometry
+        const isValidActiveShape = 
+          (layerType === "circle" && drawPoints.length === 1) ||
+          (layerType === "line" && drawPoints.length >= 2) ||
+          (layerType === "fill" && drawPoints.length >= 3);
+
+        const handleAddActiveToList = () => {
+          if (!isValidActiveShape) return;
+          
+          let geom: any = null;
+          if (layerType === "circle") {
+            geom = {
+              type: "Point",
+              coordinates: drawPoints[0]
+            };
+          } else if (layerType === "line") {
+            geom = {
+              type: "LineString",
+              coordinates: drawPoints
+            };
+          } else if (layerType === "fill") {
+            geom = {
+              type: "Polygon",
+              coordinates: [[...drawPoints, drawPoints[0]]]
+            };
+          }
+
+          if (geom) {
+            setSessionFeatures((prev) => [
+              ...prev,
+              { geometry: geom, properties: { ...drawProperties } }
+            ]);
+            // Clear current drawing point & reset name
+            setDrawPoints([]);
+            setDrawProperties({
+              nama: `Objek Baru ${sessionFeatures.length + 2}`,
+              keterangan: "Dibuat secara interaktif"
+            });
+          }
+        };
+
+        const handleSaveAllAndClose = () => {
+          let finalFeatures = [...sessionFeatures];
+          
+          // Automatically append active shape if it is valid
+          if (isValidActiveShape) {
+            let geom: any = null;
+            if (layerType === "circle") {
+              geom = { type: "Point", coordinates: drawPoints[0] };
+            } else if (layerType === "line") {
+              geom = { type: "LineString", coordinates: drawPoints };
+            } else if (layerType === "fill") {
+              geom = { type: "Polygon", coordinates: [[...drawPoints, drawPoints[0]]] };
+            }
+            if (geom) {
+              finalFeatures.push({ geometry: geom, properties: { ...drawProperties } });
+            }
+          }
+
+          if (finalFeatures.length === 0) {
+            alert("Silakan gambar dan tambahkan minimal 1 objek terlebih dahulu!");
+            return;
+          }
+
+          onSaveDrawnFeature(drawingLayerId, finalFeatures);
+          setDrawPoints([]);
+          setSessionFeatures([]);
+          setDrawProperties({ nama: "Fitur Baru", keterangan: "Dibuat secara interaktif" });
+        };
+
+        return (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#0f172a]/95 border-2 border-red-500 rounded-xl shadow-2xl p-4 z-40 w-full max-w-lg text-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs">
+            <div className="flex justify-between items-center border-b border-[#334155] pb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                <h4 className="font-bold text-xs text-slate-100 font-mono tracking-wide uppercase">
+                  Mode Menggambar Multi: {targetLayer?.name || "Layer Kustom"}
+                </h4>
+              </div>
+              <div className="text-[10px] font-mono text-slate-400">
+                {drawPoints.length} Titik Aktif | {sessionFeatures.length} Sesi Terkumpul
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
+              💡 <strong>Panduan:</strong> Klik peta untuk menggambar ({layerType === "fill" ? "Poligon" : layerType === "line" ? "Garis" : "Titik"}). Klik <strong>"+ Tambah Ke Sesi"</strong> untuk menampung objek, lalu buat objek berikutnya. Jika selesai, klik <strong>"Simpan Semua"</strong>.
+            </p>
+
+            {/* Form to set attributes for the current active feature */}
+            <div className="grid grid-cols-2 gap-2 text-xs bg-[#1e293b]/40 p-2.5 rounded-lg border border-[#334155]/50">
+              <div className="col-span-2 text-[10px] text-red-400 font-bold uppercase font-mono tracking-wider mb-0.5 flex justify-between">
+                <span>Atribut Objek Aktif</span>
+                <span className="text-slate-400 font-normal normal-case">
+                  ({drawPoints.length} koordinat)
+                </span>
+              </div>
+              <div>
+                <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Nama Fitur
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Titik Pos Pantau"
+                  value={drawProperties.nama}
+                  onChange={(e) => setDrawProperties((prev) => ({ ...prev, nama: e.target.value }))}
+                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 placeholder-slate-700 focus:outline-none focus:border-red-500 transition-all font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Keterangan
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Kondisi Baik"
+                  value={drawProperties.keterangan || ""}
+                  onChange={(e) => setDrawProperties((prev) => ({ ...prev, keterangan: e.target.value }))}
+                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 placeholder-slate-700 focus:outline-none focus:border-red-500 transition-all font-mono"
+                />
+              </div>
+
+              {/* Action to add the active drawing to the session list */}
+              <div className="col-span-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleAddActiveToList}
+                  disabled={!isValidActiveShape}
+                  className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold font-mono rounded text-[10px] transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  ➕ Tambah Objek Ke Sesi ({sessionFeatures.length + 1})
+                </button>
+              </div>
+            </div>
+
+            {/* List of features added to the temporary session */}
+            {sessionFeatures.length > 0 && (
+              <div className="flex flex-col gap-1.5 bg-[#0f172a] p-2.5 rounded-lg border border-[#334155]">
+                <div className="text-[9px] text-slate-400 font-bold uppercase font-mono tracking-wider">
+                  Daftar Objek Sementara Di Sesi ({sessionFeatures.length})
+                </div>
+                <div className="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1 scrollbar-thin">
+                  {sessionFeatures.map((f, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center bg-[#1e293b]/70 px-2 py-1.5 rounded border border-[#334155]/60 text-[10px]"
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-slate-200 truncate font-mono">
+                          {idx + 1}. {f.properties.nama}
+                        </span>
+                        <span className="text-[9px] text-slate-400 truncate max-w-[280px]">
+                          {f.properties.keterangan || "-"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSessionFeatures((prev) => prev.filter((_, i) => i !== idx))}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1 rounded transition-all cursor-pointer flex items-center justify-center"
+                        title="Hapus objek ini"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1 border-t border-[#334155]/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setDrawPoints([]);
+                  setSessionFeatures([]);
+                  setDrawProperties({ nama: "Fitur Baru", keterangan: "Dibuat secara interaktif" });
+                  onSaveDrawnFeature(drawingLayerId, null, null);
+                }}
+                className="flex-1 py-1.5 bg-[#1e293b] hover:bg-slate-800 text-slate-300 font-bold font-mono rounded text-[10px] border border-[#334155] transition-all cursor-pointer"
+              >
+                Batalkan
+              </button>
+              
+              {drawPoints.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrawPoints([]);
+                  }}
+                  className="py-1.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold font-mono rounded text-[10px] border border-amber-500/20 transition-all cursor-pointer"
+                >
+                  Reset Aktif
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSaveAllAndClose}
+                disabled={sessionFeatures.length === 0 && !isValidActiveShape}
+                className="flex-1 py-1.5 bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:hover:bg-red-500 text-white font-bold font-mono rounded text-[10px] transition-all shadow-md cursor-pointer flex items-center justify-center gap-1"
+              >
+                💾 Simpan Semua ({sessionFeatures.length + (isValidActiveShape ? 1 : 0)})
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

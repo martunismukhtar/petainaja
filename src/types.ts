@@ -20,6 +20,7 @@ export interface GisLayer {
   lineWidth?: number;
   isUploaded?: boolean;
   geojson?: any;
+  customColumns?: string[];
 }
 
 export interface ClickedFeatureInfo {

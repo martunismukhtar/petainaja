@@ -28,7 +28,8 @@ import {
   Table,
   Download,
   Search,
-  Maximize2
+  Maximize2,
+  Trash2
 } from "lucide-react";
 import {
   KABUPATEN_DATA,
@@ -131,11 +132,13 @@ export default function App() {
   // Dynamic Uploaded Datasets
   const [uploadedGeoJSONs, setUploadedGeoJSONs] = useState<any[]>([]);
   const [isUploadedVisible, setIsUploadedVisible] = useState<boolean>(true);
+  const [drawingLayerId, setDrawingLayerId] = useState<string | null>(null);
 
   // UI Control Modals
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
   const [attributeTableLayerId, setAttributeTableLayerId] = useState<LayerId | string | null>(null);
   const [attributeSearchQuery, setAttributeSearchQuery] = useState<string>("");
+  const [newColInputName, setNewColInputName] = useState<string>("");
 
   // File Input Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -186,6 +189,191 @@ export default function App() {
       const isUploadedCount = layers.filter((l, idx) => l.isUploaded && idx < layerIndex).length;
       return prev.filter((_, idx) => idx !== isUploadedCount);
     });
+  };
+
+  const handleCreateLayer = (name: string, type: "fill" | "line" | "circle", color: string) => {
+    const newId = `custom-layer-${Date.now()}`;
+    const newLayer: GisLayer = {
+      id: newId,
+      name: name,
+      visible: true,
+      type: type,
+      color: color,
+      opacity: type === "fill" ? 0.35 : 0.85,
+      description: `Layer kustom baru tipe ${type}`,
+      count: 0,
+      isUploaded: true,
+      customColumns: ["nama", "keterangan"],
+      geojson: {
+        type: "FeatureCollection",
+        features: []
+      }
+    };
+    setLayers((prev) => [...prev, newLayer]);
+  };
+
+  const handleStartDrawing = (layerId: string) => {
+    if (drawingLayerId === layerId) {
+      setDrawingLayerId(null);
+    } else {
+      setDrawingLayerId(layerId);
+      // Ensure the drawing layer is visible on the map
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, visible: true } : l))
+      );
+      // Deactivate other spatial analysis tools
+      setActiveTool("none");
+    }
+  };
+
+  const handleSaveDrawnFeature = (layerId: string, geometryOrFeatures: any, properties?: any) => {
+    if (!geometryOrFeatures) {
+      setDrawingLayerId(null);
+      return;
+    }
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id === layerId) {
+          const currentGeoJSON = l.geojson || { type: "FeatureCollection", features: [] };
+          
+          let newFeatures: any[] = [];
+          if (Array.isArray(geometryOrFeatures)) {
+            newFeatures = geometryOrFeatures.map((f) => ({
+              type: "Feature",
+              geometry: f.geometry,
+              properties: f.properties || {}
+            }));
+          } else {
+            newFeatures = [{
+              type: "Feature",
+              geometry: geometryOrFeatures,
+              properties: properties || {}
+            }];
+          }
+
+          const updatedFeatures = [...(currentGeoJSON.features || []), ...newFeatures];
+          return {
+            ...l,
+            count: updatedFeatures.length,
+            geojson: {
+              ...currentGeoJSON,
+              features: updatedFeatures
+            }
+          };
+        }
+        return l;
+      })
+    );
+    setDrawingLayerId(null);
+  };
+
+  const handleAddColumn = (layerId: string | LayerId, colName: string) => {
+    const cleanKey = colName.trim().toLowerCase().replace(/\s+/g, "_");
+    if (!cleanKey) return;
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id === layerId) {
+          const currentGeoJSON = l.geojson || { type: "FeatureCollection", features: [] };
+          const updatedFeatures = (currentGeoJSON.features || []).map((f: any) => ({
+            ...f,
+            properties: {
+              ...f.properties,
+              [cleanKey]: f.properties?.[cleanKey] !== undefined ? f.properties[cleanKey] : ""
+            }
+          }));
+          const currentCols = l.customColumns || ["nama", "keterangan"];
+          const updatedCols = currentCols.includes(cleanKey) ? currentCols : [...currentCols, cleanKey];
+          return {
+            ...l,
+            customColumns: updatedCols,
+            geojson: {
+              ...currentGeoJSON,
+              features: updatedFeatures
+            }
+          };
+        }
+        return l;
+      })
+    );
+  };
+
+  const handleDeleteColumn = (layerId: string | LayerId, colKey: string) => {
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id === layerId) {
+          const currentGeoJSON = l.geojson || { type: "FeatureCollection", features: [] };
+          const updatedFeatures = (currentGeoJSON.features || []).map((f: any) => {
+            const props = { ...f.properties };
+            delete props[colKey];
+            return {
+              ...f,
+              properties: props
+            };
+          });
+          const currentCols = l.customColumns || ["nama", "keterangan"];
+          const updatedCols = currentCols.filter((k) => k !== colKey);
+          return {
+            ...l,
+            customColumns: updatedCols,
+            geojson: {
+              ...currentGeoJSON,
+              features: updatedFeatures
+            }
+          };
+        }
+        return l;
+      })
+    );
+  };
+
+  const handleUpdateAttribute = (layerId: string | LayerId, featureIndex: number, key: string, value: any) => {
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id === layerId) {
+          const currentGeoJSON = l.geojson || { type: "FeatureCollection", features: [] };
+          const updatedFeatures = (currentGeoJSON.features || []).map((f: any, idx: number) => {
+            if (idx === featureIndex) {
+              return {
+                ...f,
+                properties: {
+                  ...f.properties,
+                  [key]: value
+                }
+              };
+            }
+            return f;
+          });
+          return {
+            ...l,
+            geojson: {
+              ...currentGeoJSON,
+              features: updatedFeatures
+            }
+          };
+        }
+        return l;
+      })
+    );
+  };
+
+  const handleDeleteFeature = (layerId: string | LayerId, featureIndex: number) => {
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id === layerId) {
+          const currentGeoJSON = l.geojson || { type: "FeatureCollection", features: [] };
+          const updatedFeatures = (currentGeoJSON.features || []).filter((_: any, idx: number) => idx !== featureIndex);
+          return {
+            ...l,
+            count: updatedFeatures.length,
+            geojson: {
+              ...currentGeoJSON,
+              features: updatedFeatures
+            }
+          };
+        }
+        return l;
+      })
+    );
   };
 
   const handleExportLayer = (id: LayerId | string, format: "shp" | "kml" | "geojson") => {
@@ -501,12 +689,15 @@ export default function App() {
       ];
     } else {
       const customL = layers.find((l) => l.id === attributeTableLayerId);
-      if (customL && customL.isUploaded && customL.geojson) {
-        geojson = customL.geojson;
+      if (customL && customL.isUploaded) {
+        geojson = customL.geojson || { type: "FeatureCollection", features: [] };
         name = customL.name;
         
-        // Auto-extract column headers based on keys in properties
+        // Auto-extract column headers based on keys in properties AND customColumns
         const keys = new Set<string>();
+        if (customL.customColumns) {
+          customL.customColumns.forEach((k) => keys.add(k));
+        }
         geojson.features?.forEach((f: any) => {
           if (f.properties) {
             Object.keys(f.properties).forEach((k) => keys.add(k));
@@ -514,7 +705,10 @@ export default function App() {
         });
         
         if (keys.size === 0) {
-          cols = [{ key: "id", label: "ID Fitur" }];
+          cols = [
+            { key: "nama", label: "Nama" },
+            { key: "keterangan", label: "Keterangan" }
+          ];
         } else {
           cols = Array.from(keys).map((k) => ({
             key: k,
@@ -602,6 +796,9 @@ export default function App() {
             onOpenAttributeTable={handleOpenAttributeTable}
             onExportLayer={handleExportLayer}
             onRemoveLayer={handleRemoveLayer}
+            onCreateLayer={handleCreateLayer}
+            drawingLayerId={drawingLayerId}
+            onStartDrawing={handleStartDrawing}
           />
         )}
 
@@ -622,6 +819,8 @@ export default function App() {
           flyToCoords={flyToCoords}
           onResetFlyTo={() => setFlyToCoords(null)}
           uploadedGeoJSONs={isUploadedVisible ? uploadedGeoJSONs : []}
+          drawingLayerId={drawingLayerId}
+          onSaveDrawnFeature={handleSaveDrawnFeature}
         />
       </div>
 
@@ -750,6 +949,8 @@ export default function App() {
             );
           });
 
+          const isCustomLayer = layers.some((l) => l.id === attributeTableLayerId && l.isUploaded);
+
           return (
             <div className="absolute inset-0 bg-[#0f172a]/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
               <div className="bg-[#0f172a] border border-[#334155] rounded-xl shadow-2xl p-5 w-full max-w-5xl text-slate-100 flex flex-col gap-3.5 animate-in zoom-in-95 duration-200 h-[80vh]">
@@ -771,9 +972,9 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Search & Export bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#1e293b]/40 p-2.5 rounded-lg border border-[#334155]/40 text-xs">
-                  <div className="relative flex-1 max-w-md">
+                {/* Search, Export & New Column Form bar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#1e293b]/40 p-2.5 rounded-lg border border-[#334155]/40 text-xs">
+                  <div className="relative flex-1 max-w-sm">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
                       <Search className="w-3.5 h-3.5 text-slate-400" />
                     </span>
@@ -785,6 +986,41 @@ export default function App() {
                       className="w-full bg-[#0f172a] text-slate-200 pl-8 pr-3 py-1.5 rounded border border-[#334155] text-xs focus:outline-none focus:border-[#38bdf8] transition-colors placeholder:text-slate-500 font-mono"
                     />
                   </div>
+
+                  {/* Add New Column Form if it's a custom/editable layer */}
+                  {isCustomLayer && (
+                    <div className="flex items-center gap-1.5 bg-[#0f172a] p-1 rounded-md border border-[#334155] max-w-sm">
+                      <input
+                        type="text"
+                        placeholder="Tambah kolom kustom..."
+                        value={newColInputName}
+                        onChange={(e) => setNewColInputName(e.target.value)}
+                        className="bg-transparent text-slate-200 px-2.5 py-1 text-xs focus:outline-none placeholder:text-slate-600 font-mono w-32"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const val = newColInputName.trim();
+                            if (val) {
+                              handleAddColumn(attributeTableLayerId, val);
+                              setNewColInputName("");
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          const val = newColInputName.trim();
+                          if (val) {
+                            handleAddColumn(attributeTableLayerId, val);
+                            setNewColInputName("");
+                          }
+                        }}
+                        className="py-1 px-2.5 bg-[#10b981] hover:bg-emerald-600 text-slate-950 font-bold rounded text-[10px] font-mono transition-colors cursor-pointer"
+                      >
+                        + Tambah Kolom
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono font-semibold text-slate-400">
                       Menampilkan: <strong className="text-[#38bdf8]">{filteredFeatures.length}</strong> dari {activeFeatures.length} baris
@@ -793,19 +1029,19 @@ export default function App() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleExportLayer(attributeTableLayerId, "geojson")}
-                        className="py-1 px-2.5 bg-[#10b981]/10 hover:bg-[#10b981]/25 text-[#10b981] border border-[#10b981]/30 rounded text-[10px] font-bold font-mono transition-all flex items-center gap-1"
+                        className="py-1 px-2.5 bg-[#10b981]/10 hover:bg-[#10b981]/25 text-[#10b981] border border-[#10b981]/30 rounded text-[10px] font-bold font-mono transition-all flex items-center gap-1 cursor-pointer"
                       >
                         <Download className="w-3 h-3" /> GeoJSON
                       </button>
                       <button
                         onClick={() => handleExportLayer(attributeTableLayerId, "kml")}
-                        className="py-1 px-2.5 bg-[#f59e0b]/10 hover:bg-[#f59e0b]/25 text-[#f59e0b] border border-[#f59e0b]/30 rounded text-[10px] font-bold font-mono transition-all flex items-center gap-1"
+                        className="py-1 px-2.5 bg-[#f59e0b]/10 hover:bg-[#f59e0b]/25 text-[#f59e0b] border border-[#f59e0b]/30 rounded text-[10px] font-bold font-mono transition-all flex items-center gap-1 cursor-pointer"
                       >
                         <Download className="w-3 h-3" /> KML
                       </button>
                       <button
                         onClick={() => handleExportLayer(attributeTableLayerId, "shp")}
-                        className="py-1 px-2.5 bg-[#38bdf8]/10 hover:bg-[#38bdf8]/25 text-[#38bdf8] border border-[#38bdf8]/30 rounded text-[10px] font-bold font-mono transition-all flex items-center gap-1"
+                        className="py-1 px-2.5 bg-[#38bdf8]/10 hover:bg-[#38bdf8]/25 text-[#38bdf8] border border-[#38bdf8]/30 rounded text-[10px] font-bold font-mono transition-all flex items-center gap-1 cursor-pointer"
                         title="Ekspor sebagai SHP (WKT CSV)"
                       >
                         <Download className="w-3 h-3" /> SHP/CSV
@@ -825,11 +1061,24 @@ export default function App() {
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-[#1e293b]/85 border-b border-[#334155] text-[10px] uppercase font-mono tracking-wider text-[#38bdf8] sticky top-0 z-10 backdrop-blur-xs">
-                          <th className="py-2.5 px-3">No</th>
+                          <th className="py-2.5 px-3 w-12 text-center">No</th>
                           {activeCols.map((col) => (
-                            <th key={col.key} className="py-2.5 px-3">{col.label}</th>
+                            <th key={col.key} className="py-2.5 px-3 min-w-[120px]">
+                              <div className="flex items-center justify-between gap-1 group">
+                                <span className="font-bold">{col.label}</span>
+                                {isCustomLayer && col.key !== "nama" && col.key !== "keterangan" && (
+                                  <button
+                                    onClick={() => handleDeleteColumn(attributeTableLayerId, col.key)}
+                                    className="text-slate-400 hover:text-red-400 p-0.5 hover:bg-[#1e293b] rounded transition-all cursor-pointer"
+                                    title={`Hapus kolom: ${col.label}`}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </th>
                           ))}
-                          <th className="py-2.5 px-3 text-center">Aksi Navigasi</th>
+                          <th className="py-2.5 px-3 text-center w-44 font-bold">Aksi Operasional</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -837,32 +1086,56 @@ export default function App() {
                           const props = feature.properties || {};
                           return (
                             <tr key={idx} className="border-b border-[#334155]/40 hover:bg-[#1e293b]/40 even:bg-[#1e293b]/15 transition-all">
-                              <td className="py-2 px-3 font-mono font-semibold text-slate-400">{idx + 1}</td>
+                              <td className="py-2 px-3 font-mono font-semibold text-slate-400 text-center">{idx + 1}</td>
                               {activeCols.map((col) => (
-                                <td key={col.key} className="py-2 px-3 text-slate-200">
-                                  {props[col.key] !== undefined ? String(props[col.key]) : "-"}
+                                <td key={col.key} className="py-1 px-3 text-slate-200">
+                                  {isCustomLayer ? (
+                                    <input
+                                      type="text"
+                                      value={props[col.key] !== undefined ? String(props[col.key]) : ""}
+                                      onChange={(e) => handleUpdateAttribute(attributeTableLayerId, idx, col.key, e.target.value)}
+                                      className="w-full bg-transparent border border-transparent hover:border-[#334155]/70 focus:border-[#38bdf8] focus:bg-[#0f172a] px-2 py-0.5 rounded text-xs text-slate-200 focus:outline-none transition-all placeholder:text-slate-700 font-mono"
+                                      placeholder="..."
+                                    />
+                                  ) : (
+                                    <span className="font-mono">{props[col.key] !== undefined ? String(props[col.key]) : "-"}</span>
+                                  )}
                                 </td>
                               ))}
-                              <td className="py-2 px-3 text-center">
-                                {(() => {
-                                  const coords = getFeatureCenter(feature);
-                                  if (!coords) return <span className="text-slate-500 font-mono text-[10px]">No Geo</span>;
-                                  return (
+                              <td className="py-1.5 px-3">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {(() => {
+                                    const coords = getFeatureCenter(feature);
+                                    if (!coords) return <span className="text-slate-500 font-mono text-[10px]">No Geo</span>;
+                                    return (
+                                      <button
+                                        onClick={() => {
+                                          handleZoomToPin(coords);
+                                          setClickedFeature({
+                                            layerId: attributeTableLayerId,
+                                            layerName: activeLayerName,
+                                            properties: props,
+                                            coordinates: coords
+                                          });
+                                          setAttributeTableLayerId(null);
+                                        }}
+                                        className="py-1 px-2.5 bg-[#38bdf8]/10 hover:bg-[#38bdf8] hover:text-slate-950 text-[#38bdf8] font-bold rounded text-[10px] font-mono transition-all inline-flex items-center gap-1 shadow-sm border border-[#38bdf8]/20 cursor-pointer"
+                                      >
+                                        <Maximize2 className="w-3 h-3" /> Zoom
+                                      </button>
+                                    );
+                                  })()}
+                                  
+                                  {isCustomLayer && (
                                     <button
-                                      onClick={() => {
-                                        handleZoomToPin(coords);
-                                        setClickedFeature({
-                                          layerName: activeLayerName,
-                                          properties: props,
-                                          coordinates: coords
-                                        });
-                                      }}
-                                      className="py-1 px-2.5 bg-[#38bdf8]/10 hover:bg-[#38bdf8] hover:text-slate-950 text-[#38bdf8] font-bold rounded text-[10px] font-mono transition-all inline-flex items-center gap-1 shadow-sm border border-[#38bdf8]/20"
+                                      onClick={() => handleDeleteFeature(attributeTableLayerId, idx)}
+                                      className="py-1 px-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white font-bold rounded text-[10px] font-mono transition-all inline-flex items-center gap-1 border border-red-500/20 cursor-pointer"
+                                      title="Hapus fitur"
                                     >
-                                      <Maximize2 className="w-3 h-3" /> Zoom Ke
+                                      <Trash2 className="w-3 h-3" /> Hapus
                                     </button>
-                                  );
-                                })()}
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -877,7 +1150,7 @@ export default function App() {
                   <span>Sistem Proyeksi WGS 84 • EPSG:4326</span>
                   <button
                     onClick={() => setAttributeTableLayerId(null)}
-                    className="py-1.5 px-4 bg-[#38bdf8] hover:bg-[#0ea5e9] text-slate-950 font-bold rounded text-xs transition-colors"
+                    className="py-1.5 px-4 bg-[#38bdf8] hover:bg-[#0ea5e9] text-slate-950 font-bold rounded text-xs transition-colors cursor-pointer"
                   >
                     Tutup Tabel Atribut
                   </button>
