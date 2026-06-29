@@ -14,7 +14,8 @@ import type {
   ClickedFeatureInfo,
   CustomPin,
   BasemapId,
-  GisTool
+  GisTool,
+  EditingFeature
 } from "./types";
 import {
   BarChart2,
@@ -97,7 +98,17 @@ const INITIAL_LAYERS: GisLayer[] = [
 
 export default function App() {
   // --- CORE STATE ---
-  const [layers, setLayers] = useState<GisLayer[]>(INITIAL_LAYERS);
+  const [layers, setLayers] = useState<GisLayer[]>(() => {
+    return INITIAL_LAYERS.map(layer => {
+      let geojson: any = null;
+      if (layer.id === LayerId.KABUPATEN) geojson = JSON.parse(JSON.stringify(KABUPATEN_DATA));
+      else if (layer.id === LayerId.JALAN) geojson = JSON.parse(JSON.stringify(JALAN_DATA));
+      else if (layer.id === LayerId.SUNGAI) geojson = JSON.parse(JSON.stringify(SUNGAI_DATA));
+      else if (layer.id === LayerId.LANDMARK) geojson = JSON.parse(JSON.stringify(LANDMARK_DATA));
+      return { ...layer, geojson };
+    });
+  });
+  const [editingFeature, setEditingFeature] = useState<EditingFeature | null>(null);
   const [activeBasemap, setActiveBasemap] = useState<BasemapId>("voyager");
   const [activeTool, setActiveTool] = useState<GisTool>("none");
   const [clickedFeature, setClickedFeature] = useState<ClickedFeatureInfo | null>(null);
@@ -176,6 +187,12 @@ export default function App() {
     );
   };
 
+  const handleRenameLayer = (id: string, name: string) => {
+    setLayers((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, name } : l))
+    );
+  };
+
   const handleOpenAttributeTable = (id: LayerId | string) => {
     setAttributeTableLayerId(id);
     setAttributeSearchQuery("");
@@ -210,6 +227,64 @@ export default function App() {
       }
     };
     setLayers((prev) => [...prev, newLayer]);
+  };
+
+  const handleCreateWmsLayer = (name: string, url: string, layersParam: string) => {
+    const newWmsId = `wms-layer-${Date.now()}`;
+    const newLayer: GisLayer = {
+      id: newWmsId,
+      name: name,
+      visible: true,
+      type: "wms",
+      color: "#ffffff",
+      opacity: 0.8,
+      description: `WMS Raster Layer dari server: ${url}`,
+      wmsUrl: url,
+      wmsLayers: layersParam,
+      count: 0
+    };
+    setLayers((prev) => [...prev, newLayer]);
+  };
+
+  const handleEditFeature = (layerId: string, featureIndex: number, geometry: any, properties: any) => {
+    setEditingFeature({
+      layerId,
+      featureIndex,
+      geometry,
+      properties
+    });
+  };
+
+  const handleCancelEditing = () => {
+    setEditingFeature(null);
+  };
+
+  const handleSaveEditedFeature = (layerId: string, featureIndex: number, geometry: any, properties: any) => {
+    setLayers((prev) => prev.map((layer) => {
+      if (layer.id === layerId && layer.geojson) {
+        const updatedFeatures = [...layer.geojson.features];
+        if (featureIndex >= 0 && featureIndex < updatedFeatures.length) {
+          updatedFeatures[featureIndex] = {
+            ...updatedFeatures[featureIndex],
+            geometry,
+            properties: {
+              ...updatedFeatures[featureIndex].properties,
+              ...properties
+            }
+          };
+        }
+        return {
+          ...layer,
+          geojson: {
+            ...layer.geojson,
+            features: updatedFeatures
+          }
+        };
+      }
+      return layer;
+    }));
+    setEditingFeature(null);
+    setClickedFeature(null);
   };
 
   const handleStartDrawing = (layerId: string) => {
@@ -799,6 +874,10 @@ export default function App() {
             onCreateLayer={handleCreateLayer}
             drawingLayerId={drawingLayerId}
             onStartDrawing={handleStartDrawing}
+            onEditFeature={handleEditFeature}
+            onCreateWmsLayer={handleCreateWmsLayer}
+            onRenameLayer={handleRenameLayer}
+            onDeleteFeature={handleDeleteFeature}
           />
         )}
 
@@ -821,6 +900,9 @@ export default function App() {
           uploadedGeoJSONs={isUploadedVisible ? uploadedGeoJSONs : []}
           drawingLayerId={drawingLayerId}
           onSaveDrawnFeature={handleSaveDrawnFeature}
+          editingFeature={editingFeature}
+          onSaveEditedFeature={handleSaveEditedFeature}
+          onCancelEditing={handleCancelEditing}
         />
       </div>
 

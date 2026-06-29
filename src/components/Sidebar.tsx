@@ -52,6 +52,10 @@ interface SidebarProps {
   onCreateLayer?: (name: string, type: "fill" | "line" | "circle", color: string) => void;
   drawingLayerId?: string | null;
   onStartDrawing?: (layerId: string) => void;
+  onEditFeature?: (layerId: string, featureIndex: number, geometry: any, properties: any) => void;
+  onCreateWmsLayer?: (name: string, url: string, layersParam: string) => void;
+  onRenameLayer?: (id: string, newName: string) => void;
+  onDeleteFeature?: (layerId: string, featureIndex: number) => void;
 }
 
 export default function Sidebar({
@@ -77,18 +81,31 @@ export default function Sidebar({
   onRemoveLayer,
   onCreateLayer,
   drawingLayerId,
-  onStartDrawing
+  onStartDrawing,
+  onEditFeature,
+  onCreateWmsLayer,
+  onRenameLayer,
+  onDeleteFeature
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeLayerConfigId, setActiveLayerConfigId] = useState<LayerId | string | null>(null);
+  const [expandedFeatureListLayerId, setExpandedFeatureListLayerId] = useState<string | null>(null);
   const [isCreatingLayer, setIsCreatingLayer] = useState(false);
   const [newLayerName, setNewLayerName] = useState("");
   const [newLayerType, setNewLayerType] = useState<"fill" | "line" | "circle">("circle");
   const [newLayerColor, setNewLayerColor] = useState("#10b981");
 
+  const [createLayerTypeMode, setCreateLayerTypeMode] = useState<"geojson" | "wms">("geojson");
+  const [wmsUrl, setWmsUrl] = useState("https://kemendagri.go.id/geoserver/wms");
+  const [wmsLayers, setWmsLayers] = useState("0");
+
   const handleCreateLayerSubmit = () => {
     if (!newLayerName.trim()) return;
-    onCreateLayer?.(newLayerName.trim(), newLayerType, newLayerColor);
+    if (createLayerTypeMode === "geojson") {
+      onCreateLayer?.(newLayerName.trim(), newLayerType, newLayerColor);
+    } else {
+      onCreateWmsLayer?.(newLayerName.trim(), wmsUrl.trim(), wmsLayers.trim());
+    }
     setNewLayerName("");
     setIsCreatingLayer(false);
   };
@@ -197,6 +214,33 @@ export default function Sidebar({
                       <span className="text-[10px] font-bold uppercase text-[#38bdf8] font-mono">Layer Baru</span>
                       <button onClick={() => setIsCreatingLayer(false)} className="text-slate-400 hover:text-white text-xs cursor-pointer">✕</button>
                     </div>
+
+                    {/* Selector Mode Tab */}
+                    <div className="flex border border-[#334155] rounded p-0.5 bg-[#1e293b]/50">
+                      <button
+                        type="button"
+                        onClick={() => setCreateLayerTypeMode("geojson")}
+                        className={`flex-1 py-1 text-[9px] font-mono font-bold rounded transition-colors cursor-pointer ${
+                          createLayerTypeMode === "geojson"
+                            ? "bg-[#38bdf8] text-[#0f172a]"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        Vector (GeoJSON)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreateLayerTypeMode("wms")}
+                        className={`flex-1 py-1 text-[9px] font-mono font-bold rounded transition-colors cursor-pointer ${
+                          createLayerTypeMode === "wms"
+                            ? "bg-[#38bdf8] text-[#0f172a]"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        WMS Raster
+                      </button>
+                    </div>
+
                     <div className="space-y-2 text-xs">
                       <div>
                         <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Nama Layer</label>
@@ -208,34 +252,63 @@ export default function Sidebar({
                           className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 focus:outline-none focus:border-[#38bdf8] text-xs font-mono placeholder:text-slate-600"
                         />
                       </div>
-                      <div>
-                        <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Tipe Geometri</label>
-                        <select
-                          value={newLayerType}
-                          onChange={(e) => setNewLayerType(e.target.value as 'fill' | 'line' | 'circle')}
-                          className="w-full bg-[#1e293b] border border-[#334155] rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-[#38bdf8] text-xs cursor-pointer font-mono"
-                        >
-                          <option value="circle">Titik (Point)</option>
-                          <option value="line">Garis (LineString)</option>
-                          <option value="fill">Poligon (Polygon)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Warna Layer</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={newLayerColor}
-                            onChange={(e) => setNewLayerColor(e.target.value)}
-                            className="w-6 h-6 bg-transparent border-0 cursor-pointer p-0 rounded-full"
-                          />
-                          <span className="text-[10px] text-slate-400 font-mono uppercase font-bold">{newLayerColor}</span>
-                        </div>
-                      </div>
+
+                      {createLayerTypeMode === "geojson" ? (
+                        <>
+                          <div>
+                            <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Tipe Geometri</label>
+                            <select
+                              value={newLayerType}
+                              onChange={(e) => setNewLayerType(e.target.value as 'fill' | 'line' | 'circle')}
+                              className="w-full bg-[#1e293b] border border-[#334155] rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-[#38bdf8] text-xs cursor-pointer font-mono"
+                            >
+                              <option value="circle">Titik (Point)</option>
+                              <option value="line">Garis (LineString)</option>
+                              <option value="fill">Poligon (Polygon)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Warna Layer</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={newLayerColor}
+                                onChange={(e) => setNewLayerColor(e.target.value)}
+                                className="w-6 h-6 bg-transparent border-0 cursor-pointer p-0 rounded-full"
+                              />
+                              <span className="text-[10px] text-slate-400 font-mono uppercase font-bold">{newLayerColor}</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="text-[9px] font-mono text-slate-400 block mb-0.5">URL WMS Server</label>
+                            <input
+                              type="text"
+                              placeholder="https://geoserver.example.com/geoserver/wms"
+                              value={wmsUrl}
+                              onChange={(e) => setWmsUrl(e.target.value)}
+                              className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 focus:outline-none focus:border-[#38bdf8] text-xs font-mono placeholder:text-slate-600"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-mono text-slate-400 block mb-0.5">Layer Name WMS (Parameters)</label>
+                            <input
+                              type="text"
+                              placeholder="workspace:layer_name atau ID layer"
+                              value={wmsLayers}
+                              onChange={(e) => setWmsLayers(e.target.value)}
+                              className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 focus:outline-none focus:border-[#38bdf8] text-xs font-mono placeholder:text-slate-600"
+                            />
+                          </div>
+                        </>
+                      )}
+
                       <div className="flex gap-1.5 pt-1">
                         <button
                           onClick={handleCreateLayerSubmit}
-                          disabled={!newLayerName.trim()}
+                          disabled={!newLayerName.trim() || (createLayerTypeMode === "wms" && (!wmsUrl.trim() || !wmsLayers.trim()))}
                           className="flex-1 py-1 bg-[#10b981] hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold rounded text-[10px] transition-colors cursor-pointer"
                         >
                           Buat
@@ -289,20 +362,18 @@ export default function Sidebar({
                         <Settings2 className="w-3.5 h-3.5" />
                       </button>
 
-                      {/* Custom Uploaded Layer Trash Button */}
-                      {layer.isUploaded && (
-                        <button
-                          onClick={() => {
-                            if (confirm(`Apakah Anda yakin ingin menghapus layer "${layer.name}"?`)) {
-                              onRemoveLayer?.(layer.id);
-                            }
-                          }}
-                          className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded border border-transparent transition-colors"
-                          title="Hapus Layer Kustom"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      {/* Trash Button to Remove Layer */}
+                      <button
+                        onClick={() => {
+                          if (confirm(`Apakah Anda yakin ingin menghapus layer "${layer.name}"?`)) {
+                            onRemoveLayer?.(layer.id);
+                          }
+                        }}
+                        className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded border border-transparent transition-colors"
+                        title="Hapus Layer ini"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
 
                       {/* Visual color indicator */}
                       <span
@@ -320,6 +391,19 @@ export default function Sidebar({
                   {/* EXPANDED SETTINGS SECTION */}
                   {activeLayerConfigId === layer.id && (
                     <div className="p-3 bg-[#0f172a] border-t border-[#334155] text-xs space-y-3 animate-in slide-in-from-top-1 duration-150">
+                      {/* Rename Layer */}
+                      <div className="space-y-1 bg-[#1e293b]/30 p-2 rounded-lg border border-[#334155]/30">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">
+                          ✏️ Edit Nama Layer
+                        </span>
+                        <input
+                          type="text"
+                          value={layer.name}
+                          onChange={(e) => onRenameLayer?.(layer.id, e.target.value)}
+                          className="w-full bg-[#0f172a] border border-[#334155] rounded-md px-2 py-1 text-slate-100 font-mono text-[11px] focus:outline-none focus:border-[#38bdf8]"
+                        />
+                      </div>
+
                       {/* Color Settings */}
                       <div className="space-y-1">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono flex items-center gap-1">
@@ -436,7 +520,7 @@ export default function Sidebar({
                       {/* Actions: Open Attributes & Export */}
                       <div className="pt-2 border-t border-[#334155]/40 flex flex-col gap-2">
                         {/* Custom Drawing Button */}
-                        {layer.isUploaded && (
+                        {layer.type !== "wms" && (
                           <button
                             onClick={() => onStartDrawing?.(layer.id)}
                             className={`w-full py-1.5 px-3 border rounded flex items-center justify-center gap-1.5 font-bold text-xs transition-all duration-150 shadow-sm cursor-pointer ${
@@ -486,6 +570,69 @@ export default function Sidebar({
                             </button>
                           </div>
                         </div>
+
+                        {/* List of features in the layer */}
+                        {layer.type !== "wms" && layer.geojson && (
+                          <div className="pt-2 border-t border-[#334155]/40 space-y-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedFeatureListLayerId(expandedFeatureListLayerId === layer.id ? null : layer.id)}
+                              className="w-full py-1 px-2 bg-[#1e293b]/50 hover:bg-[#1e293b] text-slate-300 rounded flex justify-between items-center text-[10px] font-mono border border-[#334155]/30 transition-all cursor-pointer"
+                            >
+                              <span>📁 Daftar Fitur ({layer.geojson.features?.length || 0})</span>
+                              <span>{expandedFeatureListLayerId === layer.id ? "▲" : "▼"}</span>
+                            </button>
+
+                            {expandedFeatureListLayerId === layer.id && (
+                              <div className="max-h-48 overflow-y-auto border border-[#334155]/40 rounded-md bg-[#020617]/50 p-1.5 space-y-1 divide-y divide-[#334155]/20">
+                                {layer.geojson.features && layer.geojson.features.length > 0 ? (
+                                  layer.geojson.features.map((feat: any, idx: number) => {
+                                    const name = feat.properties?.nama || feat.properties?.name || `Fitur #${idx + 1}`;
+                                    const geomType = feat.geometry?.type || "Point";
+                                    return (
+                                      <div key={idx} className="pt-1.5 pb-1 flex items-center justify-between gap-2 text-[10px]">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-semibold text-slate-200 truncate" title={name}>
+                                            {name}
+                                          </div>
+                                          <div className="text-[8px] text-slate-500 font-mono uppercase">
+                                            {geomType}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <button
+                                            type="button"
+                                            onClick={() => onEditFeature?.(layer.id, idx, feat.geometry, feat.properties)}
+                                            className="p-1 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-slate-950 rounded transition-all cursor-pointer"
+                                            title="Edit Geometri & Atribut"
+                                          >
+                                            <PenTool className="w-2.5 h-2.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (confirm(`Apakah Anda yakin ingin menghapus fitur "${name}"?`)) {
+                                                onDeleteFeature?.(layer.id, idx);
+                                              }
+                                            }}
+                                            className="p-1 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded transition-all cursor-pointer"
+                                            title="Hapus Fitur"
+                                          >
+                                            <Trash2 className="w-2.5 h-2.5" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="text-center text-slate-500 py-2 text-[10px] italic">
+                                    Belum ada fitur di layer ini
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -598,6 +745,24 @@ export default function Sidebar({
                       Lat: {clickedFeature.coordinates[1].toFixed(6)}
                     </p>
                   </div>
+
+                  {/* Vertex & Attributes Editing Trigger */}
+                  {clickedFeature.layerId && clickedFeature.featureIndex !== undefined && onEditFeature && (
+                    <button
+                      onClick={() => {
+                        onEditFeature(
+                          clickedFeature.layerId as string,
+                          clickedFeature.featureIndex as number,
+                          (clickedFeature as any).geometry,
+                          clickedFeature.properties
+                        );
+                      }}
+                      className="w-full py-2 px-3 bg-orange-600 hover:bg-orange-500 text-white border border-orange-500/40 rounded-lg flex items-center justify-center gap-1.5 font-bold text-xs transition-all duration-150 shadow-md cursor-pointer animate-pulse"
+                    >
+                      <PenTool className="w-3.5 h-3.5" />
+                      Edit Geometri & Atribut (Vertex)
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="py-6 text-center text-slate-400 flex flex-col items-center justify-center gap-2">

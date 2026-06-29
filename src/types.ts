@@ -9,7 +9,7 @@ export interface GisLayer {
   id: LayerId | string;
   name: string;
   visible: boolean;
-  type: "fill" | "line" | "circle";
+  type: "fill" | "line" | "circle" | "wms";
   color: string;
   outlineColor?: string;
   opacity: number;
@@ -21,6 +21,15 @@ export interface GisLayer {
   isUploaded?: boolean;
   geojson?: any;
   customColumns?: string[];
+  wmsUrl?: string;
+  wmsLayers?: string;
+}
+
+export interface EditingFeature {
+  layerId: string;
+  featureIndex: number;
+  geometry: any;
+  properties: Record<string, any>;
 }
 
 export interface ClickedFeatureInfo {
@@ -28,6 +37,8 @@ export interface ClickedFeatureInfo {
   layerName: string;
   properties: Record<string, any>;
   coordinates: [number, number];
+  featureIndex?: number;
+  geometry?: any;
 }
 
 export type BasemapId = "positron" | "dark-matter" | "voyager";

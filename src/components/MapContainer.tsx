@@ -61,6 +61,25 @@ interface MapContainerProps {
   uploadedGeoJSONs: any[];
   drawingLayerId: string | null;
   onSaveDrawnFeature: (layerId: string, geometry: any, properties?: any) => void;
+  editingFeature?: any | null;
+  onSaveEditedFeature?: (layerId: string, featureIndex: number, updatedGeometry: any, updatedProperties: any) => void;
+  onCancelEditing?: () => void;
+}
+
+function getSqDist(p: [number, number], w: [number, number]) {
+  return (p[0] - w[0]) ** 2 + (p[1] - w[1]) ** 2;
+}
+
+function distToSegmentSquared(p: [number, number], v: [number, number], w: [number, number]) {
+  const l2 = getSqDist(v, w);
+  if (l2 === 0) return getSqDist(p, v);
+  let t = ((p[0] - v[0]) * (w[0] - v[0]) + (p[1] - v[1]) * (w[1] - v[1])) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return getSqDist(p, [v[0] + t * (w[0] - v[0]), v[1] + t * (w[1] - v[1])]);
+}
+
+function distToSegment(p: [number, number], v: [number, number], w: [number, number]) {
+  return Math.sqrt(distToSegmentSquared(p, v, w));
 }
 
 export default function MapContainer({
@@ -80,7 +99,10 @@ export default function MapContainer({
   onResetFlyTo,
   uploadedGeoJSONs,
   drawingLayerId,
-  onSaveDrawnFeature
+  onSaveDrawnFeature,
+  editingFeature,
+  onSaveEditedFeature,
+  onCancelEditing
 }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const miniMapContainerRef = useRef<HTMLDivElement>(null);
@@ -122,6 +144,10 @@ export default function MapContainer({
   const [printOrientation, setPrintOrientation] = useState<"landscape" | "portrait">("landscape");
   const [capturedMapUrl, setCapturedMapUrl] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [printLogo, setPrintLogo] = useState<string | null>(null);
+  const [printScaleText, setPrintScaleText] = useState("1:25.000");
+  const [printSourceText, setPrintSourceText] = useState("Sumber: Badan Perencanaan Pembangunan Daerah Kota Banda Aceh");
+  const printLogoInputRef = useRef<HTMLInputElement>(null);
 
   // Ref to always reference the freshest state variables inside the map event closures
   const stateRef = useRef({
@@ -130,7 +156,8 @@ export default function MapContainer({
     activeTool,
     bufferRadius,
     onFeatureClick,
-    sessionFeatures
+    sessionFeatures,
+    editingFeature
   });
 
   useEffect(() => {
@@ -140,9 +167,10 @@ export default function MapContainer({
       activeTool,
       bufferRadius,
       onFeatureClick,
-      sessionFeatures
+      sessionFeatures,
+      editingFeature
     };
-  }, [drawingLayerId, layers, activeTool, bufferRadius, onFeatureClick, sessionFeatures]);
+  }, [drawingLayerId, layers, activeTool, bufferRadius, onFeatureClick, sessionFeatures, editingFeature]);
 
   // --- 1. INITIALIZE MAIN & MINI MAP ---
   useEffect(() => {
@@ -203,11 +231,27 @@ export default function MapContainer({
 
     // Main map interaction clicks
     mainMap.on("click", handleMapClick);
+    mainMap.on("contextmenu", handleMapContextMenu);
+
+    // Prevent default context menu on container when editing
+    const container = mapContainerRef.current;
+    const preventContextMenu = (event: MouseEvent) => {
+      const { editingFeature: curEditingFeature } = stateRef.current;
+      if (curEditingFeature) {
+        event.preventDefault();
+      }
+    };
+    if (container) {
+      container.addEventListener("contextmenu", preventContextMenu);
+    }
 
     // Mapbox custom scale control
     mainMap.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: "metric" }), "bottom-left");
 
     return () => {
+      if (container) {
+        container.removeEventListener("contextmenu", preventContextMenu);
+      }
       mainMap.remove();
       miniMap.remove();
       mapRef.current = null;
@@ -244,6 +288,271 @@ export default function MapContainer({
     onResetFlyTo();
   }, [flyToCoords]);
 
+  // --- VERTEX EDITING ENGINE ---
+  const [activeEditingCoords, setActiveEditingCoords] = useState<[number, number][]>([]);
+  const [editProperties, setEditProperties] = useState<Record<string, any>>({});
+  const editingMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const isDraggingVertexRef = useRef(false);
+
+  // Draggable window state for FLOATING FEATURE DRAWING OVERLAY
+  const [drawDragOffset, setDrawDragOffset] = useState({ x: 0, y: 0 });
+  const [isDrawDragging, setIsDrawDragging] = useState(false);
+  const [drawDragStart, setDrawDragStart] = useState({ x: 0, y: 0 });
+
+  // Draggable window state for FLOATING FEATURE VERTEX EDITING OVERLAY
+  const [editDragOffset, setEditDragOffset] = useState({ x: 0, y: 0 });
+  const [isEditDragging, setIsEditDragging] = useState(false);
+  const [editDragStart, setEditDragStart] = useState({ x: 0, y: 0 });
+
+  // Draggable window state for PIN CREATION POPUP DIALOG
+  const [pinDragOffset, setPinDragOffset] = useState({ x: 0, y: 0 });
+  const [isPinDragging, setIsPinDragging] = useState(false);
+  const [pinDragStart, setPinDragStart] = useState({ x: 0, y: 0 });
+
+  // --- DRAGGING EFFECT FOR DRAWING MODAL ---
+  const handleDrawDragMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('input, button, select, textarea, [role="button"]')) return;
+    setIsDrawDragging(true);
+    setDrawDragStart({
+      x: e.clientX - drawDragOffset.x,
+      y: e.clientY - drawDragOffset.y
+    });
+  };
+
+  useEffect(() => {
+    if (!isDrawDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setDrawDragOffset({
+        x: e.clientX - drawDragStart.x,
+        y: e.clientY - drawDragStart.y
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDrawDragging(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDrawDragging, drawDragStart]);
+
+  // --- DRAGGING EFFECT FOR VERTEX EDITING MODAL ---
+  const handleEditDragMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('input, button, select, textarea, [role="button"]')) return;
+    setIsEditDragging(true);
+    setEditDragStart({
+      x: e.clientX - editDragOffset.x,
+      y: e.clientY - editDragOffset.y
+    });
+  };
+
+  useEffect(() => {
+    if (!isEditDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setEditDragOffset({
+        x: e.clientX - editDragStart.x,
+        y: e.clientY - editDragStart.y
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsEditDragging(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isEditDragging, editDragStart]);
+
+  // --- DRAGGING EFFECT FOR PIN CREATION POPUP DIALOG ---
+  const handlePinDragMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('input, button, select, textarea, [role="button"]')) return;
+    setIsPinDragging(true);
+    setPinDragStart({
+      x: e.clientX - pinDragOffset.x,
+      y: e.clientY - pinDragOffset.y
+    });
+  };
+
+  useEffect(() => {
+    if (!isPinDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setPinDragOffset({
+        x: e.clientX - pinDragStart.x,
+        y: e.clientY - pinDragStart.y
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsPinDragging(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isPinDragging, pinDragStart]);
+
+  useEffect(() => {
+    if (!pinDialogCoords) {
+      setPinDragOffset({ x: 0, y: 0 });
+    }
+  }, [pinDialogCoords]);
+
+  const recreateEditingMarkers = (
+    map: maplibregl.Map,
+    coordsList: [number, number][],
+    layerType: string,
+    geomType: string
+  ) => {
+    editingMarkersRef.current.forEach((m) => m.remove());
+    editingMarkersRef.current = [];
+
+    const currentCoords = [...coordsList];
+
+    const updateVisualEditLayer = (list: [number, number][]) => {
+      const src = map.getSource("editing-highlight-source") as maplibregl.GeoJSONSource;
+      if (!src) return;
+
+      let drawGeom: any = null;
+      if (layerType === "circle" || geomType === "Point") {
+        drawGeom = {
+          type: "Point",
+          coordinates: list[0] || [0, 0]
+        };
+      } else if (layerType === "line" || geomType === "LineString") {
+        drawGeom = {
+          type: "LineString",
+          coordinates: list
+        };
+      } else if (layerType === "fill" || geomType === "Polygon") {
+        drawGeom = {
+          type: "Polygon",
+          coordinates: list.length >= 3 ? [[...list, list[0]]] : []
+        };
+      }
+
+      src.setData({
+        type: "FeatureCollection",
+        features: [{
+          type: "Feature",
+          geometry: drawGeom,
+          properties: {}
+        }]
+      });
+    };
+
+    updateVisualEditLayer(currentCoords);
+
+    currentCoords.forEach((coord, idx) => {
+      const el = document.createElement("div");
+      el.className = "w-6 h-6 bg-orange-500 border-2 border-white rounded-full shadow-lg cursor-move hover:scale-125 transition-transform flex items-center justify-center text-[10px] text-white font-bold font-mono select-none";
+      el.textContent = String(idx + 1);
+      el.title = "Seret untuk memindahkan. Klik kanan untuk menghapus vertex ini.";
+
+      // Right-click to delete vertex
+      el.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const minRequired = (geomType === "Polygon" || geomType === "MultiPolygon") ? 3 : 2;
+        if (geomType === "Point") {
+          return; // Point has exactly 1 vertex and cannot be deleted
+        }
+
+        if (currentCoords.length <= minRequired) {
+          alert(`Tidak dapat menghapus vertex. Minimal diperlukan ${minRequired} vertex untuk tipe geometri ini.`);
+          return;
+        }
+
+        const updated = currentCoords.filter((_, i) => i !== idx);
+        setActiveEditingCoords(updated);
+        recreateEditingMarkers(map, updated, layerType, geomType);
+      });
+
+      const marker = new maplibregl.Marker({
+        element: el,
+        draggable: true
+      })
+        .setLngLat(coord)
+        .addTo(map);
+
+      marker.on("dragstart", () => {
+        isDraggingVertexRef.current = true;
+        map.dragPan.disable();
+      });
+
+      marker.on("drag", () => {
+        const lngLat = marker.getLngLat();
+        currentCoords[idx] = [lngLat.lng, lngLat.lat];
+        updateVisualEditLayer(currentCoords);
+      });
+
+      marker.on("dragend", () => {
+        isDraggingVertexRef.current = false;
+        map.dragPan.enable();
+        const lngLat = marker.getLngLat();
+        currentCoords[idx] = [lngLat.lng, lngLat.lat];
+        updateVisualEditLayer(currentCoords);
+        setActiveEditingCoords([...currentCoords]);
+      });
+
+      editingMarkersRef.current.push(marker);
+    });
+  };
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapLoaded) return;
+
+    editingMarkersRef.current.forEach((m) => m.remove());
+    editingMarkersRef.current = [];
+
+    const editSource = map.getSource("editing-highlight-source") as maplibregl.GeoJSONSource;
+    if (editSource) {
+      editSource.setData({ type: "FeatureCollection", features: [] });
+    }
+
+    if (!editingFeature) {
+      setActiveEditingCoords([]);
+      setEditProperties({});
+      setEditDragOffset({ x: 0, y: 0 });
+      return;
+    }
+
+    const geom = editingFeature.geometry;
+    const layerId = editingFeature.layerId;
+    const targetLayer = layers.find((l) => l.id === layerId);
+    const layerType = targetLayer?.type || "circle";
+
+    setEditProperties({ ...editingFeature.properties });
+
+    let initialCoords: [number, number][] = [];
+    if (geom.type === "Point") {
+      initialCoords = [geom.coordinates];
+    } else if (geom.type === "LineString") {
+      initialCoords = [...geom.coordinates];
+    } else if (geom.type === "Polygon") {
+      const ring = geom.coordinates[0] || [];
+      initialCoords = ring.slice(0, -1);
+    }
+
+    setActiveEditingCoords(initialCoords);
+    recreateEditingMarkers(map, initialCoords, layerType, geom.type);
+  }, [editingFeature, isMapLoaded]);
+
   // --- 4. TOGGLE LAYER VISIBILITIES & DYNAMIC STYLING ---
   useEffect(() => {
     const map = mapRef.current;
@@ -253,6 +562,7 @@ export default function MapContainer({
     try {
       const style = map.getStyle();
       if (style) {
+        // 1. Custom vector layers cleanup
         style.layers.forEach((mapL) => {
           if (mapL.id.startsWith("custom-layer-")) {
             const remainder = mapL.id.replace("custom-layer-outline-", "").replace("custom-layer-", "");
@@ -275,9 +585,56 @@ export default function MapContainer({
             }
           }
         });
+
+        // 2. WMS layers cleanup
+        style.layers.forEach((mapL) => {
+          if (mapL.id.startsWith("wms-layer-")) {
+            const remainder = mapL.id.replace("wms-layer-", "");
+            const layerStillExists = layers.some((l) => l.id === remainder);
+            if (!layerStillExists) {
+              if (map.getLayer(mapL.id)) {
+                map.removeLayer(mapL.id);
+              }
+            }
+          }
+        });
+        Object.keys(style.sources).forEach((sourceKey) => {
+          if (sourceKey.startsWith("wms-source-")) {
+            const remainder = sourceKey.replace("wms-source-", "");
+            const layerStillExists = layers.some((l) => l.id === remainder);
+            if (!layerStillExists) {
+              if (map.getSource(sourceKey)) {
+                map.removeSource(sourceKey);
+              }
+            }
+          }
+        });
+
+        // 3. Standard system layers cleanup if removed from prop list
+        const hasKabupaten = layers.some((l) => l.id === LayerId.KABUPATEN);
+        if (!hasKabupaten) {
+          if (map.getLayer("kabupaten-layer")) map.removeLayer("kabupaten-layer");
+          if (map.getLayer("kabupaten-outline")) map.removeLayer("kabupaten-outline");
+        }
+
+        const hasJalan = layers.some((l) => l.id === LayerId.JALAN);
+        if (!hasJalan) {
+          if (map.getLayer("jalan-layer")) map.removeLayer("jalan-layer");
+        }
+
+        const hasSungai = layers.some((l) => l.id === LayerId.SUNGAI);
+        if (!hasSungai) {
+          if (map.getLayer("sungai-layer")) map.removeLayer("sungai-layer");
+        }
+
+        const hasLandmark = layers.some((l) => l.id === LayerId.LANDMARK);
+        if (!hasLandmark) {
+          landmarkMarkersRef.current.forEach((m) => m.remove());
+          landmarkMarkersRef.current = [];
+        }
       }
     } catch (e) {
-      console.error("Error cleaning up custom layers:", e);
+      console.error("Error cleaning up custom/WMS/standard layers:", e);
     }
 
     layers.forEach((layer) => {
@@ -304,6 +661,10 @@ export default function MapContainer({
             map.setPaintProperty("kabupaten-outline", "line-dasharray", null);
           }
         }
+        if (layer.geojson && map.getSource("kabupaten-source")) {
+          const src = map.getSource("kabupaten-source") as maplibregl.GeoJSONSource;
+          src.setData(layer.geojson);
+        }
       }
 
       // Jalan
@@ -322,6 +683,10 @@ export default function MapContainer({
             map.setPaintProperty("jalan-layer", "line-dasharray", null);
           }
         }
+        if (layer.geojson && map.getSource("jalan-source")) {
+          const src = map.getSource("jalan-source") as maplibregl.GeoJSONSource;
+          src.setData(layer.geojson);
+        }
       }
 
       // Sungai
@@ -339,6 +704,10 @@ export default function MapContainer({
           } else {
             map.setPaintProperty("sungai-layer", "line-dasharray", null);
           }
+        }
+        if (layer.geojson && map.getSource("sungai-source")) {
+          const src = map.getSource("sungai-source") as maplibregl.GeoJSONSource;
+          src.setData(layer.geojson);
         }
       }
 
@@ -420,12 +789,28 @@ export default function MapContainer({
             const features = map.queryRenderedFeatures(e.point, { layers: [mainLayerId] });
             if (features.length > 0) {
               const feat = features[0];
+              const targetLayer = layers.find((l) => l.id === layer.id);
+              let fIndex = -1;
+              if (targetLayer && targetLayer.geojson) {
+                fIndex = targetLayer.geojson.features.findIndex((f: any) => {
+                  if (f.properties && feat.properties) {
+                    const fName = f.properties.nama || f.properties.name;
+                    const featName = feat.properties.nama || feat.properties.name;
+                    if (fName && featName) return fName === featName;
+                    return JSON.stringify(f.properties) === JSON.stringify(feat.properties);
+                  }
+                  return false;
+                });
+              }
+
               onFeatureClick({
                 layerId: layer.id,
                 layerName: layer.name,
                 properties: feat.properties || {},
-                coordinates: e.lngLat.toArray() as [number, number]
-              });
+                coordinates: e.lngLat.toArray() as [number, number],
+                geometry: feat.geometry,
+                featureIndex: fIndex >= 0 ? fIndex : undefined
+              } as any);
             }
           });
 
@@ -476,6 +861,38 @@ export default function MapContainer({
           }
         }
       }
+
+      // Dynamic WMS Raster Layers
+      if (layer.type === "wms" && layer.wmsUrl) {
+        const sourceId = `wms-source-${layer.id}`;
+        const mainLayerId = `wms-layer-${layer.id}`;
+
+        if (!map.getSource(sourceId)) {
+          const separator = layer.wmsUrl.includes("?") ? "&" : "?";
+          const wmsTileUrl = `${layer.wmsUrl}${separator}service=WMS&version=1.1.1&request=GetMap&bbox={bbox-epsg-3857}&width=256&height=256&srs=EPSG:3857&format=image/png&transparent=true&layers=${layer.wmsLayers || "0"}`;
+
+          map.addSource(sourceId, {
+            type: "raster",
+            tiles: [wmsTileUrl],
+            tileSize: 256
+          });
+
+          map.addLayer({
+            id: mainLayerId,
+            type: "raster",
+            source: sourceId,
+            paint: {
+              "raster-opacity": layer.opacity
+            }
+          });
+        }
+
+        // Sync visibility and opacity of WMS layer
+        if (map.getLayer(mainLayerId)) {
+          map.setLayoutProperty(mainLayerId, "visibility", visibilityValue);
+          map.setPaintProperty(mainLayerId, "raster-opacity", layer.opacity);
+        }
+      }
     });
   }, [layers, isMapLoaded, onFeatureClick]);
 
@@ -494,9 +911,11 @@ export default function MapContainer({
     const layerOpacity = landmarkLayer?.opacity ?? 1.0;
     const iconStyle = landmarkLayer?.iconStyle || "marker";
 
-    LANDMARK_DATA.features.forEach((feature) => {
+    const featuresSource = landmarkLayer?.geojson?.features || LANDMARK_DATA.features;
+
+    featuresSource.forEach((feature, idx) => {
       const coords = feature.geometry.coordinates as [number, number];
-      const props = feature.properties;
+      const props = feature.properties || {};
 
       // Create Custom Marker HTML
       const el = document.createElement("div");
@@ -544,17 +963,20 @@ export default function MapContainer({
       // Tooltip/label on hover
       const label = document.createElement("div");
       label.className = "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-slate-950 text-white font-sans text-[10px] py-1 px-2 rounded shadow-md border border-slate-800 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-semibold";
-      label.textContent = props.name;
+      label.textContent = props.name || props.nama || "Landmark";
       el.appendChild(label);
 
       // Attach click to feature info panel
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         onFeatureClick({
+          layerId: LayerId.LANDMARK,
           layerName: "Landmarks (Titik Penting)",
           properties: props,
-          coordinates: coords
-        });
+          coordinates: coords,
+          geometry: feature.geometry,
+          featureIndex: idx
+        } as any);
         map.flyTo({ center: coords, zoom: 15, duration: 1000 });
       });
 
@@ -893,9 +1315,86 @@ export default function MapContainer({
       });
     }
 
+    // 7. Active Feature Editing Highlight Layer
+    if (!map.getSource("editing-highlight-source")) {
+      map.addSource("editing-highlight-source", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: []
+        }
+      });
+
+      // Fill Layer (Polygons)
+      map.addLayer({
+        id: "editing-highlight-fill",
+        type: "fill",
+        source: "editing-highlight-source",
+        paint: {
+          "fill-color": "#f97316",
+          "fill-opacity": 0.4
+        },
+        filter: ["==", "$type", "Polygon"]
+      });
+
+      // Line Layer (Lines & Polygon borders)
+      map.addLayer({
+        id: "editing-highlight-line",
+        type: "line",
+        source: "editing-highlight-source",
+        paint: {
+          "line-color": "#f97316",
+          "line-width": 4,
+          "line-dasharray": [1.5, 1]
+        },
+        filter: ["in", "$type", "LineString", "Polygon"]
+      });
+
+      // Point Layer (Circles)
+      map.addLayer({
+        id: "editing-highlight-circle",
+        type: "circle",
+        source: "editing-highlight-source",
+        paint: {
+          "circle-radius": 7,
+          "circle-color": "#f97316",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff"
+        },
+        filter: ["==", "$type", "Point"]
+      });
+    }
+
     // Trigger Initial Markers rendering after WebGL is armed
     renderLandmarkMarkers();
     renderCustomPinMarkers();
+
+    // Prevent map dragging when the mouse is over active drawing/editing vector layers on the map
+    const activeVectorLayers = [
+      "draw-temp-fill-layer",
+      "draw-temp-line-layer",
+      "draw-temp-circle-layer",
+      "editing-highlight-fill",
+      "editing-highlight-line",
+      "editing-highlight-circle",
+      "measure-line-layer",
+      "measure-points-layer",
+      "buffer-fill-layer",
+      "buffer-outline-layer"
+    ];
+
+    activeVectorLayers.forEach((layerId) => {
+      if (map.getLayer(layerId)) {
+        map.on("mouseenter", layerId, () => {
+          map.dragPan.disable();
+        });
+        map.on("mouseleave", layerId, () => {
+          if (!isDraggingVertexRef.current) {
+            map.dragPan.enable();
+          }
+        });
+      }
+    });
   };
 
   // --- 9. SPATIAL CLICK INTERACTION INTERCEPT ---
@@ -909,8 +1408,14 @@ export default function MapContainer({
       layers: curLayers,
       activeTool: curActiveTool,
       bufferRadius: curBufferRadius,
-      onFeatureClick: curOnFeatureClick
+      onFeatureClick: curOnFeatureClick,
+      editingFeature: curEditingFeature
     } = stateRef.current;
+
+    // Vertex editing intercept
+    if (curEditingFeature) {
+      return;
+    }
 
     // Drawing intercept
     if (curDrawingLayerId) {
@@ -960,19 +1465,96 @@ export default function MapContainer({
     if (features.length > 0) {
       const feature = features[0];
       let layerName = "Data Spasial";
+      let layerId = "";
 
-      if (feature.layer?.id === "kabupaten-layer") layerName = "Kecamatan (Poligon)";
-      else if (feature.layer?.id === "jalan-layer") layerName = "Infrastruktur Jalan (Line)";
-      else if (feature.layer?.id === "sungai-layer") layerName = "Hidrologi Sungai (Line)";
+      if (feature.layer?.id === "kabupaten-layer") {
+        layerName = "Kecamatan (Poligon)";
+        layerId = "kabupaten";
+      } else if (feature.layer?.id === "jalan-layer") {
+        layerName = "Infrastruktur Jalan (Line)";
+        layerId = "jalan";
+      } else if (feature.layer?.id === "sungai-layer") {
+        layerName = "Hidrologi Sungai (Line)";
+        layerId = "sungai";
+      }
+
+      // Find feature index in state
+      const targetLayer = curLayers.find((l) => l.id === layerId);
+      let fIndex = -1;
+      if (targetLayer && targetLayer.geojson) {
+        fIndex = targetLayer.geojson.features.findIndex((f: any) => {
+          if (f.properties && feature.properties) {
+            const fName = f.properties.name || f.properties.nama;
+            const featName = feature.properties.name || feature.properties.nama;
+            if (fName && featName) return fName === featName;
+            return JSON.stringify(f.properties) === JSON.stringify(feature.properties);
+          }
+          return false;
+        });
+      }
 
       curOnFeatureClick({
+        layerId: layerId,
         layerName: layerName,
-        properties: feature.properties,
-        coordinates: clickedCoords
-      });
+        properties: feature.properties || {},
+        coordinates: clickedCoords,
+        geometry: feature.geometry,
+        featureIndex: fIndex >= 0 ? fIndex : undefined
+      } as any);
     } else {
       curOnFeatureClick(null);
     }
+  };
+
+  const handleMapContextMenu = (e: maplibregl.MapMouseEvent) => {
+    const { editingFeature: curEditingFeature, layers: curLayers } = stateRef.current;
+    if (!curEditingFeature) return;
+
+    e.originalEvent.preventDefault();
+
+    const clickedCoords: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+    const geom = curEditingFeature.geometry;
+    if (geom.type === "Point") {
+      return;
+    }
+
+    setActiveEditingCoords((prev) => {
+      if (prev.length === 0) {
+        return [clickedCoords];
+      }
+
+      let bestIndex = prev.length;
+      let minDistance = Infinity;
+
+      const isPolygon = geom.type === "Polygon" || geom.type === "MultiPolygon";
+
+      for (let i = 0; i < prev.length; i++) {
+        const p1 = prev[i];
+        const p2 = prev[(i + 1) % prev.length];
+
+        if (!isPolygon && i === prev.length - 1) {
+          continue;
+        }
+
+        const dist = distToSegment(clickedCoords, p1, p2);
+        if (dist < minDistance) {
+          minDistance = dist;
+          bestIndex = i + 1;
+        }
+      }
+
+      const updated = [...prev];
+      updated.splice(bestIndex, 0, clickedCoords);
+
+      const map = mapRef.current;
+      if (map) {
+        const targetLayer = curLayers.find((l) => l.id === curEditingFeature.layerId);
+        const layerType = targetLayer?.type || "circle";
+        recreateEditingMarkers(map, updated, layerType, geom.type);
+      }
+
+      return updated;
+    });
   };
 
   // --- 10. REAL-TIME RENDER UPDATES FOR TOOLS ---
@@ -1104,6 +1686,7 @@ export default function MapContainer({
     if (drawingLayerId) return;
     setDrawPoints([]);
     setSessionFeatures([]);
+    setDrawDragOffset({ x: 0, y: 0 });
     const map = mapRef.current;
     if (map) {
       const source = map.getSource("draw-temp-source") as maplibregl.GeoJSONSource;
@@ -1269,6 +1852,25 @@ export default function MapContainer({
   const paperHeight = printPaperSize === "A4" 
     ? (isPortrait ? "297mm" : "210mm") 
     : (isPortrait ? "420mm" : "594mm");
+
+  // Handle logo upload
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setPrintLogo(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setPrintLogo(null);
+    if (printLogoInputRef.current) {
+      printLogoInputRef.current.value = "";
+    }
+  };
 
   // Camera 3D controls toggle
   const handleToggle3D = () => {
@@ -1476,16 +2078,31 @@ export default function MapContainer({
 
       {/* 4. PIN CREATION POPUP DIALOG */}
       {pinDialogCoords && (
-        <div className="absolute inset-0 bg-[#0f172a]/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-[#0f172a] border border-[#334155] rounded-xl shadow-2xl p-5 w-full max-w-sm text-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center border-b border-[#334155] pb-2.5">
+        <div className="absolute inset-0 z-50 pointer-events-none">
+          <div
+            style={{
+              transform: `translate(calc(-50% + ${pinDragOffset.x}px), ${pinDragOffset.y}px)`,
+              top: '100px',
+              left: '50%'
+            }}
+            className="pointer-events-auto absolute bg-[#0f172a]/95 border border-[#334155] rounded-xl shadow-2xl p-5 w-full max-w-sm text-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-150 select-none"
+          >
+            <div
+              onMouseDown={handlePinDragMouseDown}
+              className="flex justify-between items-center border-b border-[#334155] pb-2.5 cursor-move select-none"
+              title="Seret header ini untuk memindahkan dialog"
+            >
               <div className="flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-orange-500 animate-bounce" />
-                <h3 className="font-bold text-sm text-slate-100">Tambah Penanda Kustom</h3>
+                <h3 className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+                  Tambah Penanda Kustom
+                  <span className="text-[9px] text-[#38bdf8] font-normal normal-case animate-pulse font-mono">(Seret Panel ⬘)</span>
+                </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setPinDialogCoords(null)}
-                className="text-slate-400 hover:text-white font-bold text-xs hover:bg-[#1e293b] px-1.5 py-0.5 rounded"
+                className="text-slate-400 hover:text-white font-bold text-xs hover:bg-[#1e293b] px-1.5 py-0.5 rounded cursor-pointer"
               >
                 ✕
               </button>
@@ -1560,6 +2177,168 @@ export default function MapContainer({
           </div>
         </div>
       )}
+
+      {/* FLOATING FEATURE VERTEX EDITING OVERLAY */}
+      {editingFeature && (() => {
+        const targetLayer = layers.find((l) => l.id === editingFeature.layerId);
+        const geomType = editingFeature.geometry?.type || "Point";
+
+        const handleAddVertexAtCenter = () => {
+          const map = mapRef.current;
+          if (!map) return;
+          const center = map.getCenter();
+          const newCoord: [number, number] = [center.lng, center.lat];
+          const updated = [...activeEditingCoords, newCoord];
+          setActiveEditingCoords(updated);
+          recreateEditingMarkers(map, updated, targetLayer?.type || "circle", geomType);
+        };
+
+        const handleDeleteVertex = (idxToDelete: number) => {
+          const map = mapRef.current;
+          if (!map) return;
+          const updated = activeEditingCoords.filter((_, idx) => idx !== idxToDelete);
+          setActiveEditingCoords(updated);
+          recreateEditingMarkers(map, updated, targetLayer?.type || "circle", geomType);
+        };
+
+        const handleSaveEdits = () => {
+          if (activeEditingCoords.length === 0) return;
+
+          let finalGeom: any = null;
+          if (geomType === "Point") {
+            finalGeom = {
+              type: "Point",
+              coordinates: activeEditingCoords[0]
+            };
+          } else if (geomType === "LineString") {
+            finalGeom = {
+              type: "LineString",
+              coordinates: activeEditingCoords
+            };
+          } else if (geomType === "Polygon") {
+            finalGeom = {
+              type: "Polygon",
+              coordinates: [[...activeEditingCoords, activeEditingCoords[0]]]
+            };
+          }
+
+          if (onSaveEditedFeature) {
+            onSaveEditedFeature(editingFeature.layerId, editingFeature.featureIndex, finalGeom, editProperties);
+          }
+        };
+
+        return (
+          <div
+            style={{
+              transform: `translate(calc(-50% + ${editDragOffset.x}px), ${editDragOffset.y}px)`,
+              top: '16px',
+              left: '50%'
+            }}
+            className="absolute bg-[#0f172a]/95 border-2 border-orange-500 rounded-xl shadow-2xl p-4 z-40 w-full max-w-lg text-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs select-none"
+          >
+            <div
+              onMouseDown={handleEditDragMouseDown}
+              className="flex justify-between items-center border-b border-[#334155] pb-2 cursor-move select-none"
+              title="Seret header ini untuk memindahkan panel"
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
+                <h4 className="font-bold text-xs text-slate-100 font-mono tracking-wide uppercase flex items-center gap-1.5">
+                  Edit Vertex & Atribut: {targetLayer?.name || "Layer Kustom"}
+                  <span className="text-[9px] text-orange-400 font-normal normal-case animate-pulse">(Seret Panel ⬘)</span>
+                </h4>
+              </div>
+              <div className="text-[10px] font-mono text-slate-400">
+                {activeEditingCoords.length} Vertex Aktif
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
+              💡 <strong>Panduan:</strong> Geser penanda angka berwarna <strong>oranye</strong> di peta untuk memindahkan vertex secara interaktif. Anda juga dapat mengubah nilai atribut di bawah ini.
+            </p>
+
+            {/* Atribut Editor */}
+            <div className="grid grid-cols-2 gap-2 text-xs bg-[#1e293b]/40 p-2.5 rounded-lg border border-[#334155]/50 max-h-36 overflow-y-auto custom-scrollbar">
+              <div className="col-span-2 text-[10px] text-orange-400 font-bold uppercase font-mono tracking-wider mb-0.5">
+                Edit Atribut Fitur
+              </div>
+              {Object.keys(editProperties).map((key) => {
+                if (key === "color") return null;
+                return (
+                  <div key={key} className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase font-mono">{key}</label>
+                    <input
+                      type="text"
+                      value={editProperties[key] || ""}
+                      onChange={(e) => setEditProperties({ ...editProperties, [key]: e.target.value })}
+                      className="bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 focus:outline-none focus:border-orange-500 transition-all font-mono text-[11px]"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Vertices List */}
+            {geomType !== "Point" && (
+              <div className="flex flex-col gap-1.5 bg-[#0f172a] p-2.5 rounded-lg border border-[#334155]">
+                <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase font-mono tracking-wider">
+                  <span>Daftar Koordinat Vertices ({activeEditingCoords.length})</span>
+                  <button
+                    type="button"
+                    onClick={handleAddVertexAtCenter}
+                    className="px-2 py-0.5 bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 border border-orange-500/30 rounded text-[9px] font-mono transition-all cursor-pointer"
+                  >
+                    + Tambah Vertex Baru
+                  </button>
+                </div>
+                <div className="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1 custom-scrollbar">
+                  {activeEditingCoords.map((coord, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center bg-[#1e293b]/70 px-2.5 py-1.5 rounded border border-[#334155]/60 text-[10px] font-mono"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 bg-orange-600/20 text-orange-400 rounded-full flex items-center justify-center font-bold text-[9px]">
+                          {idx + 1}
+                        </span>
+                        <span>Lon: {coord[0].toFixed(5)}</span>
+                        <span className="text-slate-500">|</span>
+                        <span>Lat: {coord[1].toFixed(5)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteVertex(idx)}
+                        disabled={activeEditingCoords.length <= (geomType === "Polygon" ? 3 : 2)}
+                        className="text-red-400 hover:text-red-300 disabled:opacity-30 p-1 rounded transition-all cursor-pointer"
+                        title="Hapus vertex ini"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1 border-t border-[#334155]/60">
+              <button
+                type="button"
+                onClick={onCancelEditing}
+                className="flex-1 py-1.5 bg-[#1e293b] hover:bg-slate-800 text-slate-300 font-bold font-mono rounded text-[10px] border border-[#334155] transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdits}
+                className="flex-1 py-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold font-mono rounded text-[10px] transition-all shadow-md cursor-pointer"
+              >
+                Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 5. FLOATING FEATURE DRAWING OVERLAY */}
       {drawingLayerId && (() => {
@@ -1637,12 +2416,24 @@ export default function MapContainer({
         };
 
         return (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#0f172a]/95 border-2 border-red-500 rounded-xl shadow-2xl p-4 z-40 w-full max-w-lg text-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs">
-            <div className="flex justify-between items-center border-b border-[#334155] pb-2">
+          <div
+            style={{
+              transform: `translate(calc(-50% + ${drawDragOffset.x}px), ${drawDragOffset.y}px)`,
+              top: '16px',
+              left: '50%'
+            }}
+            className="absolute bg-[#0f172a]/95 border-2 border-red-500 rounded-xl shadow-2xl p-4 z-40 w-full max-w-lg text-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs select-none"
+          >
+            <div
+              onMouseDown={handleDrawDragMouseDown}
+              className="flex justify-between items-center border-b border-[#334155] pb-2 cursor-move select-none"
+              title="Seret header ini untuk memindahkan panel"
+            >
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-                <h4 className="font-bold text-xs text-slate-100 font-mono tracking-wide uppercase">
+                <h4 className="font-bold text-xs text-slate-100 font-mono tracking-wide uppercase flex items-center gap-1.5">
                   Mode Menggambar Multi: {targetLayer?.name || "Layer Kustom"}
+                  <span className="text-[9px] text-[#38bdf8] font-normal normal-case animate-pulse">(Seret Panel ⬘)</span>
                 </h4>
               </div>
               <div className="text-[10px] font-mono text-slate-400">
@@ -1784,7 +2575,7 @@ export default function MapContainer({
                 background: white !important;
                 color: black !important;
                 margin: 0 !important;
-                padding: 0 !important;
+                padding: 2px !important;
                 width: 100% !important;
                 height: 100% !important;
                 overflow: visible !important;
@@ -1797,12 +2588,12 @@ export default function MapContainer({
               }
               #print-layout-paper {
                 position: fixed !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: ${paperWidth} !important;
-                height: ${paperHeight} !important;
-                margin: 0 !important;
-                padding: 1.2cm !important;
+                left: 2px !important;
+                top: 2px !important;
+                width: calc(${paperWidth} - 4px) !important;
+                height: calc(${paperHeight} - 4px) !important;
+                margin: 2px !important;
+                padding: 2px !important;
                 box-shadow: none !important;
                 border: 4px double black !important;
                 background-color: white !important;
@@ -1813,7 +2604,7 @@ export default function MapContainer({
               }
               @page {
                 size: ${printPaperSize.toLowerCase()} ${printOrientation.toLowerCase()};
-                margin: 0;
+                margin: 2px;
               }
             }
           `}} />
@@ -1858,6 +2649,63 @@ export default function MapContainer({
                   onChange={(e) => setPrintSubtitle(e.target.value)}
                   className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
                   placeholder="Contoh: Bappeda Kota Banda Aceh"
+                />
+              </div>
+
+              {/* Logo Upload */}
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Logo / Lambang Instansi
+                </label>
+                <input
+                  ref={printLogoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[10px] file:font-mono file:font-bold file:bg-[#38bdf8]/10 file:text-[#38bdf8] hover:file:bg-[#38bdf8]/20 cursor-pointer file:cursor-pointer"
+                />
+                {printLogo && (
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <img
+                      src={printLogo}
+                      alt="Logo"
+                      className="w-8 h-8 object-contain border border-[#334155] rounded"
+                    />
+                    <button
+                      onClick={handleRemoveLogo}
+                      className="text-[10px] text-red-400 hover:text-red-300 font-mono underline cursor-pointer"
+                    >
+                      Hapus Logo
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Scale text input */}
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Skala Peta (Teks)
+                </label>
+                <input
+                  type="text"
+                  value={printScaleText}
+                  onChange={(e) => setPrintScaleText(e.target.value)}
+                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                  placeholder="Contoh: 1:25.000"
+                />
+              </div>
+
+              {/* Source / Creator text input */}
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  Sumber / Pembuat Peta
+                </label>
+                <input
+                  type="text"
+                  value={printSourceText}
+                  onChange={(e) => setPrintSourceText(e.target.value)}
+                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                  placeholder="Contoh: Sumber: Bappeda Kota Banda Aceh"
                 />
               </div>
 
@@ -1955,7 +2803,7 @@ export default function MapContainer({
               {/* This mimics the paper. Handled nicely with aspect ratio constraints */}
               <div
                 id="print-layout-paper"
-                className={`bg-white text-black p-6 border-4 border-double border-black shadow-2xl flex ${
+                className={`bg-white text-black border-4 border-double border-black shadow-2xl flex ${
                   printOrientation === "portrait" ? "flex-col" : "flex-row"
                 } gap-4 w-full ${
                   printOrientation === "landscape" ? "aspect-[1.414]" : "aspect-[0.707]"
@@ -1963,7 +2811,9 @@ export default function MapContainer({
                 style={{
                   maxHeight: "80vh",
                   width: "100%",
-                  boxSizing: "border-box"
+                  boxSizing: "border-box",
+                  margin: "2px",
+                  padding: "2px"
                 }}
               >
                 {/* A. MAP FRAME SECTION */}
@@ -1991,8 +2841,25 @@ export default function MapContainer({
                   <div className="absolute top-2 left-2 bg-white/80 border border-black px-1.5 py-0.5 text-[8px] font-mono font-bold tracking-tight rounded pointer-events-none select-none text-black">
                     SISTEM PROYEKSI: UTM ZONE 46N
                   </div>
-                  <div className="absolute bottom-2 right-2 bg-white/80 border border-black px-2 py-1 text-[9px] font-mono font-bold rounded pointer-events-none select-none text-black">
-                    Skala: Grafis Terlampir
+                  {/* Scale Bar */}
+                  <div className="absolute bottom-2 left-2 bg-white/90 border border-black px-2 py-1 rounded pointer-events-none select-none text-black flex flex-col items-start gap-0.5">
+                    <div className="flex items-center gap-0">
+                      <div className="h-1.5 w-8 bg-black border-r border-black"></div>
+                      <div className="h-1.5 w-8 bg-white border-r border-black"></div>
+                      <div className="h-1.5 w-8 bg-black border-r border-black"></div>
+                      <div className="h-1.5 w-8 bg-white"></div>
+                    </div>
+                    <div className="flex items-center gap-0 w-full text-[6px] font-mono font-bold">
+                      <span className="w-8 text-left">0</span>
+                      <span className="w-8 text-center">1</span>
+                      <span className="w-8 text-center">2</span>
+                      <span className="w-8 text-right">3 km</span>
+                    </div>
+                    <span className="text-[7px] font-mono font-bold mt-0.5">{printScaleText || "1:25.000"}</span>
+                  </div>
+                  {/* Creator / Source text */}
+                  <div className="absolute bottom-2 right-2 bg-white/80 border border-black px-2 py-1 text-[7px] font-mono font-bold rounded pointer-events-none select-none text-black max-w-[180px] text-right leading-tight">
+                    {printSourceText || "Sumber: Bappeda Banda Aceh"}
                   </div>
                 </div>
 
@@ -2003,9 +2870,17 @@ export default function MapContainer({
                     <div className="flex flex-col gap-2.5">
                       {/* Logo & Agency Info */}
                       <div className="text-center border-b-2 border-black pb-2 flex flex-col items-center justify-center gap-1">
-                        <div className="w-9 h-9 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-xs">
-                          SIG
-                        </div>
+                        {printLogo ? (
+                          <img
+                            src={printLogo}
+                            alt="Logo Instansi"
+                            className="w-10 h-10 object-contain border border-black rounded"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-xs">
+                            SIG
+                          </div>
+                        )}
                         <div className="leading-tight">
                           <h4 className="font-sans font-extrabold text-[9px] tracking-wider">PEMERINTAH KOTA</h4>
                           <h4 className="font-sans font-extrabold text-[10px] tracking-wider uppercase">BANDA ACEH</h4>
@@ -2028,12 +2903,7 @@ export default function MapContainer({
                         <div className="flex flex-col items-center">
                           <Compass className="w-8 h-8 text-black" />
                           <span className="text-[7px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
-                        </div>
-                        <div className="text-left font-mono leading-normal text-[8px]">
-                          <div>Sistem Grid: Geografis</div>
-                          <div>Spheroid: WGS 84</div>
-                          <div>Zona Proyeksi: 46N</div>
-                        </div>
+                        </div>                        
                       </div>
 
                       {/* Dynamic Legend Block */}
@@ -2079,7 +2949,8 @@ export default function MapContainer({
 
                     {/* Footer metadata block */}
                     <div className="border-t-2 border-black pt-2 text-[7px] font-mono text-slate-500 flex flex-col gap-0.5">
-                      <div>Pembuat: Portal SIG Web Banda Aceh</div>
+                      <div>{printSourceText || "Sumber: Bappeda Banda Aceh"}</div>
+                      <div>Skala: {printScaleText || "1:25.000"}</div>
                       <div>Tanggal Cetak: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
                       <div className="font-bold text-[6px] tracking-wider uppercase border-t border-slate-200 mt-1 pt-0.5">KARTOGRAFER INDONESIA</div>
                     </div>
@@ -2090,9 +2961,17 @@ export default function MapContainer({
                     {/* Col 1: Logo, Title & Subtitle */}
                     <div className="flex-1 flex flex-col gap-1.5 pr-2 border-r border-slate-300">
                       <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
-                        <div className="w-7 h-7 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-[10px]">
-                          SIG
-                        </div>
+                        {printLogo ? (
+                          <img
+                            src={printLogo}
+                            alt="Logo Instansi"
+                            className="w-7 h-7 object-contain border border-black rounded"
+                          />
+                        ) : (
+                          <div className="w-7 h-7 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-[10px]">
+                            SIG
+                          </div>
+                        )}
                         <div className="leading-tight">
                           <h4 className="font-sans font-extrabold text-[8px] uppercase tracking-wider leading-none">PEMERINTAH KOTA</h4>
                           <h4 className="font-sans font-extrabold text-[9px] uppercase tracking-wider leading-tight">BANDA ACEH</h4>
@@ -2149,10 +3028,26 @@ export default function MapContainer({
                       <div className="flex flex-col items-center justify-center shrink-0">
                         <Compass className="w-7 h-7 text-black" />
                         <span className="text-[6px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
+                        {/* Scale bar mini */}
+                        <div className="mt-1 flex flex-col items-center">
+                          <div className="flex items-center gap-0">
+                            <div className="h-1 w-5 bg-black border-r border-black"></div>
+                            <div className="h-1 w-5 bg-white border-r border-black"></div>
+                            <div className="h-1 w-5 bg-black border-r border-black"></div>
+                            <div className="h-1 w-5 bg-white"></div>
+                          </div>
+                          <div className="flex items-center gap-0 w-full text-[5px] font-mono font-bold">
+                            <span className="w-5 text-left">0</span>
+                            <span className="w-5 text-center">1</span>
+                            <span className="w-5 text-center">2</span>
+                            <span className="w-5 text-right">3km</span>
+                          </div>
+                          <span className="text-[6px] font-mono font-bold">{printScaleText || "1:25.000"}</span>
+                        </div>
                       </div>
                       <div className="text-[7px] font-mono leading-snug text-slate-600 flex flex-col justify-center min-w-0">
                         <div className="truncate">Datum: WGS 84 / UTM 46N</div>
-                        <div className="truncate">Sumber: Bappeda Banda Aceh</div>
+                        <div className="truncate">{printSourceText || "Sumber: Bappeda Banda Aceh"}</div>
                         <div className="truncate font-bold text-[6px] text-black border-t border-slate-200 mt-0.5 pt-0.5">
                           TGL: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
                         </div>
