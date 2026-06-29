@@ -33,8 +33,35 @@ import {
   Printer,
   Download,
   Compass,
-  X
+  X,
+  Type,
+  Square,
+  Slash,
+  Image as ImageIcon
 } from "lucide-react";
+
+export interface PrintLayoutElement {
+  id: string;
+  type: "text" | "line" | "rectangle" | "image";
+  x: number; // percentage from left, 0 - 100
+  y: number; // percentage from top, 0 - 100
+  width?: number; // width in px
+  height?: number; // height in px
+  content?: string; // for text
+  imageUrl?: string; // for image
+  fontSize?: number; // for text
+  fontColor?: string; // for text
+  lineWidth?: number; // for line thickness
+  lineColor?: string; // for line
+  rotation?: number; // for line/image rotation in degrees
+  rectFillColor?: string; // for rectangle
+  rectBorderColor?: string; // for rectangle
+  rectBorderWidth?: number; // for rectangle
+}
+
+const CLASSIC_NORTH_ARROW = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 5 L75 80 L50 65 L25 80 Z' fill='black'/><path d='M50 5 L50 65 L25 80 Z' fill='%23ccc'/><text x='50' y='98' font-family='sans-serif' font-size='18' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
+
+const MODERN_NORTH_ARROW = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' stroke='black' stroke-width='2' fill='none'/><path d='M50 15 L58 50 L50 45 L42 50 Z' fill='black'/><path d='M50 85 L58 50 L50 55 L42 50 Z' fill='%23777'/><text x='50' y='12' font-family='sans-serif' font-size='14' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
 
 // Basemap JSON Style URL Map
 const BASEMAP_STYLES: Record<BasemapId, string> = {
@@ -148,6 +175,186 @@ export default function MapContainer({
   const [printScaleText, setPrintScaleText] = useState("1:25.000");
   const [printSourceText, setPrintSourceText] = useState("Sumber: Badan Perencanaan Pembangunan Daerah Kota Banda Aceh");
   const printLogoInputRef = useRef<HTMLInputElement>(null);
+
+  // Dynamic layout print elements
+  const [printSidebarTab, setPrintSidebarTab] = useState<"info" | "elements">("info");
+  const [printLayoutElements, setPrintLayoutElements] = useState<PrintLayoutElement[]>([
+    {
+      id: "preset-north",
+      type: "image",
+      x: 88,
+      y: 12,
+      width: 50,
+      height: 50,
+      imageUrl: CLASSIC_NORTH_ARROW
+    }
+  ]);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+
+  // Drag handlers for print layout elements
+  const startDrag = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const element = printLayoutElements.find(el => el.id === id);
+    if (!element) return;
+    
+    setSelectedElementId(id);
+    
+    const paperEl = document.getElementById("print-layout-paper");
+    if (!paperEl) return;
+    
+    const rect = paperEl.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startXPercent = element.x;
+    const startYPercent = element.y;
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      const dxPercent = (dx / rect.width) * 100;
+      const dyPercent = (dy / rect.height) * 100;
+      
+      const newX = Math.round(Math.max(0, Math.min(100, startXPercent + dxPercent)));
+      const newY = Math.round(Math.max(0, Math.min(100, startYPercent + dyPercent)));
+      
+      setPrintLayoutElements(prev =>
+        prev.map(el => (el.id === id ? { ...el, x: newX, y: newY } : el))
+      );
+    };
+    
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+    
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const startTouchDrag = (e: React.TouchEvent, id: string) => {
+    e.stopPropagation();
+    
+    const element = printLayoutElements.find(el => el.id === id);
+    if (!element) return;
+    
+    setSelectedElementId(id);
+    
+    const paperEl = document.getElementById("print-layout-paper");
+    if (!paperEl) return;
+    
+    const rect = paperEl.getBoundingClientRect();
+    const touch = e.touches[0];
+    const startX = touch.clientX;
+    const startY = touch.clientY;
+    const startXPercent = element.x;
+    const startYPercent = element.y;
+    
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      const currentTouch = moveEvent.touches[0];
+      const dx = currentTouch.clientX - startX;
+      const dy = currentTouch.clientY - startY;
+      const dxPercent = (dx / rect.width) * 100;
+      const dyPercent = (dy / rect.height) * 100;
+      
+      const newX = Math.round(Math.max(0, Math.min(100, startXPercent + dxPercent)));
+      const newY = Math.round(Math.max(0, Math.min(100, startYPercent + dyPercent)));
+      
+      setPrintLayoutElements(prev =>
+        prev.map(el => (el.id === id ? { ...el, x: newX, y: newY } : el))
+      );
+    };
+    
+    const handleTouchEnd = () => {
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+    
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd);
+  };
+
+  const updateSelectedElement = (updates: Partial<PrintLayoutElement>) => {
+    if (!selectedElementId) return;
+    setPrintLayoutElements(prev =>
+      prev.map(el => (el.id === selectedElementId ? { ...el, ...updates } : el))
+    );
+  };
+
+  const handleAddTextElement = () => {
+    const newEl: PrintLayoutElement = {
+      id: `text-${Date.now()}`,
+      type: "text",
+      x: 50,
+      y: 50,
+      content: "Teks Baru",
+      fontSize: 16,
+      fontColor: "#000000"
+    };
+    setPrintLayoutElements(prev => [...prev, newEl]);
+    setSelectedElementId(newEl.id);
+  };
+
+  const handleAddLineElement = () => {
+    const newEl: PrintLayoutElement = {
+      id: `line-${Date.now()}`,
+      type: "line",
+      x: 50,
+      y: 50,
+      width: 100, // length in px
+      lineWidth: 3, // thickness in px
+      lineColor: "#ff0000",
+      rotation: 0
+    };
+    setPrintLayoutElements(prev => [...prev, newEl]);
+    setSelectedElementId(newEl.id);
+  };
+
+  const handleAddRectangleElement = () => {
+    const newEl: PrintLayoutElement = {
+      id: `rect-${Date.now()}`,
+      type: "rectangle",
+      x: 50,
+      y: 50,
+      width: 120,
+      height: 60,
+      rectFillColor: "rgba(255, 255, 255, 0.7)",
+      rectBorderColor: "#000000",
+      rectBorderWidth: 2
+    };
+    setPrintLayoutElements(prev => [...prev, newEl]);
+    setSelectedElementId(newEl.id);
+  };
+
+  const handleAddImageElement = () => {
+    const newEl: PrintLayoutElement = {
+      id: `image-${Date.now()}`,
+      type: "image",
+      x: 50,
+      y: 50,
+      width: 60,
+      height: 60,
+      imageUrl: CLASSIC_NORTH_ARROW
+    };
+    setPrintLayoutElements(prev => [...prev, newEl]);
+    setSelectedElementId(newEl.id);
+  };
+
+  const handleUploadElementImage = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setPrintLayoutElements(prev =>
+            prev.map(el => (el.id === id ? { ...el, imageUrl: reader.result as string } : el))
+          );
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Ref to always reference the freshest state variables inside the map event closures
   const stateRef = useRef({
@@ -1854,6 +2061,167 @@ export default function MapContainer({
     link.click();
   };
 
+  // High-fidelity local print handler via temporary hidden iframe
+  const handlePrintPDF = () => {
+    const paperEl = document.getElementById("print-layout-paper");
+    if (!paperEl) {
+      alert("Elemen lembar cetak tidak ditemukan!");
+      return;
+    }
+
+    // Create a temporary iframe for printing
+    const iframe = document.createElement("iframe");
+    iframe.name = "print_iframe";
+    iframe.style.position = "absolute";
+    iframe.style.width = "0px";
+    iframe.style.height = "0px";
+    iframe.style.left = "-10000px";
+    iframe.style.top = "-10000px";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      alert("Gagal membuka window cetak!");
+      return;
+    }
+
+    // Capture styles
+    let stylesHtml = "";
+    for (const styleSheet of Array.from(document.styleSheets)) {
+      try {
+        let rulesHtml = "";
+        for (const rule of Array.from(styleSheet.cssRules)) {
+          rulesHtml += rule.cssText;
+        }
+        stylesHtml += `<style>${rulesHtml}</style>`;
+      } catch (e) {
+        // Fallback for cross-origin sheets (like google fonts link, etc.)
+        if (styleSheet.href) {
+          stylesHtml += `<link rel="stylesheet" href="${styleSheet.href}">`;
+        }
+      }
+    }
+
+    // Also copy direct link elements
+    document.querySelectorAll("link[rel='stylesheet']").forEach((link) => {
+      stylesHtml += link.outerHTML;
+    });
+
+    const isPortrait = printOrientation === "portrait";
+    const widthMm = printPaperSize === "A4" 
+      ? (isPortrait ? "210mm" : "297mm") 
+      : (isPortrait ? "297mm" : "420mm");
+    const heightMm = printPaperSize === "A4" 
+      ? (isPortrait ? "297mm" : "210mm") 
+      : (isPortrait ? "420mm" : "594mm");
+
+    // Write html inside iframe
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${printTitle || "Peta Cetak"}</title>
+          ${stylesHtml}
+          <style>
+            @page {
+              size: ${printPaperSize === "A4" ? "A4" : "A3"} ${printOrientation};
+              margin: 0;
+            }
+            @media print {
+              /* Override parent page styles that may be copied via stylesHtml */
+              body * {
+                visibility: visible !important;
+              }
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                color: black !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              .print\\:hidden {
+                display: none !important;
+              }
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background-color: white !important;
+              color: black !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            #print-paper-wrapper {
+              width: ${widthMm};
+              height: ${heightMm};
+              max-width: 100% !important;
+              max-height: 100% !important;
+              box-sizing: border-box;
+              margin: 0 auto;
+              padding: 8mm;
+              background: white !important;
+              color: black !important;
+              overflow: hidden;
+              position: relative;
+            }
+            /* Override the container styles so that it fills the exact paper size printed */
+            .print-paper-class {
+              width: 100% !important;
+              height: 100% !important;
+              max-height: none !important;
+              max-width: none !important;
+              border: 4px double black !important;
+              box-shadow: none !important;
+              margin: 0 !important;
+              padding: 6px !important;
+              box-sizing: border-box !important;
+              display: flex !important;
+              flex-direction: ${isPortrait ? "column" : "row"} !important;
+              background: white !important;
+              color: black !important;
+            }
+            .print\\:hidden {
+              display: none !important;
+            }
+          </style>
+        </head>
+        <body>
+          <div id="print-paper-wrapper">
+            <div class="${paperEl.className} print-paper-class">
+              ${paperEl.innerHTML}
+            </div>
+          </div>
+          <script>
+            // Strip any focus/selection overlays and checkmarks
+            document.querySelectorAll('.ring-2, .ring-sky-400').forEach(el => {
+              el.style.ring = "none";
+              el.style.outline = "none";
+              el.style.boxShadow = "none";
+              el.className = el.className.replace(/ring-\\S+/g, '').replace(/ring-offset-\\S+/g, '');
+            });
+            // Hide selection badges and buttons
+            document.querySelectorAll('.print\\\\:hidden, button').forEach(el => {
+              el.style.display = "none";
+            });
+            // Run print when resources have loaded
+            window.onload = function() {
+              setTimeout(() => {
+                window.focus();
+                window.print();
+                setTimeout(() => {
+                  window.parent.document.body.removeChild(window.frameElement);
+                }, 1000);
+              }, 800);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    doc.close();
+  };
+
   const isPortrait = printOrientation === "portrait";
   const paperWidth = printPaperSize === "A4" 
     ? (isPortrait ? "210mm" : "297mm") 
@@ -2633,154 +3001,575 @@ export default function MapContainer({
               </button>
             </div>
 
-            {/* Title options */}
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Judul Utama Peta
-                </label>
-                <input
-                  type="text"
-                  value={printTitle}
-                  onChange={(e) => setPrintTitle(e.target.value)}
-                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
-                  placeholder="Contoh: PETA KERAWANAN BANJIR"
-                />
-              </div>
+            {/* Tab Headers */}
+            <div className="grid grid-cols-2 gap-1 bg-slate-900/60 p-1 rounded-lg border border-[#334155]/60 text-xs font-mono">
+              <button
+                onClick={() => setPrintSidebarTab("info")}
+                className={`py-1.5 rounded transition-all cursor-pointer ${
+                  printSidebarTab === "info"
+                    ? "bg-[#38bdf8]/10 border border-[#38bdf8]/30 text-[#38bdf8] font-bold"
+                    : "text-slate-400 hover:text-slate-200 border border-transparent"
+                }`}
+              >
+                Informasi Utama
+              </button>
+              <button
+                onClick={() => setPrintSidebarTab("elements")}
+                className={`py-1.5 rounded transition-all cursor-pointer ${
+                  printSidebarTab === "elements"
+                    ? "bg-[#38bdf8]/10 border border-[#38bdf8]/30 text-[#38bdf8] font-bold"
+                    : "text-slate-400 hover:text-slate-200 border border-transparent"
+                }`}
+              >
+                Elemen Tambahan
+              </button>
+            </div>
 
-              <div>
-                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Sub-Judul / Instansi
-                </label>
-                <input
-                  type="text"
-                  value={printSubtitle}
-                  onChange={(e) => setPrintSubtitle(e.target.value)}
-                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
-                  placeholder="Contoh: Bappeda Kota Banda Aceh"
-                />
-              </div>
+            {/* Title options / Add Elements Tab content */}
+            {printSidebarTab === "info" ? (
+              <div className="flex flex-col gap-3 overflow-y-auto max-h-[55vh] pr-1 scrollbar-thin">
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Judul Utama Peta
+                  </label>
+                  <input
+                    type="text"
+                    value={printTitle}
+                    onChange={(e) => setPrintTitle(e.target.value)}
+                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                    placeholder="Contoh: PETA KERAWANAN BANJIR"
+                  />
+                </div>
 
-              {/* Logo Upload */}
-              <div>
-                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Logo / Lambang Instansi
-                </label>
-                <input
-                  ref={printLogoInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[10px] file:font-mono file:font-bold file:bg-[#38bdf8]/10 file:text-[#38bdf8] hover:file:bg-[#38bdf8]/20 cursor-pointer file:cursor-pointer"
-                />
-                {printLogo && (
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <img
-                      src={printLogo}
-                      alt="Logo"
-                      className="w-8 h-8 object-contain border border-[#334155] rounded"
-                    />
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Sub-Judul / Instansi
+                  </label>
+                  <input
+                    type="text"
+                    value={printSubtitle}
+                    onChange={(e) => setPrintSubtitle(e.target.value)}
+                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                    placeholder="Contoh: Bappeda Kota Banda Aceh"
+                  />
+                </div>
+
+                {/* Logo Upload */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Logo / Lambang Instansi
+                  </label>
+                  <input
+                    ref={printLogoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[10px] file:font-mono file:font-bold file:bg-[#38bdf8]/10 file:text-[#38bdf8] hover:file:bg-[#38bdf8]/20 cursor-pointer file:cursor-pointer"
+                  />
+                  {printLogo && (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <img
+                        src={printLogo}
+                        alt="Logo"
+                        className="w-8 h-8 object-contain border border-[#334155] rounded"
+                      />
+                      <button
+                        onClick={handleRemoveLogo}
+                        className="text-[10px] text-red-400 hover:text-red-300 font-mono underline cursor-pointer"
+                      >
+                        Hapus Logo
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Scale text input */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Skala Peta (Teks)
+                  </label>
+                  <input
+                    type="text"
+                    value={printScaleText}
+                    onChange={(e) => setPrintScaleText(e.target.value)}
+                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                    placeholder="Contoh: 1:25.000"
+                  />
+                </div>
+
+                {/* Source / Creator text input */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Sumber / Pembuat Peta
+                  </label>
+                  <input
+                    type="text"
+                    value={printSourceText}
+                    onChange={(e) => setPrintSourceText(e.target.value)}
+                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                    placeholder="Contoh: Sumber: Bappeda Kota Banda Aceh"
+                  />
+                </div>
+
+                {/* Paper size selection */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Ukuran Kertas
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                     <button
-                      onClick={handleRemoveLogo}
-                      className="text-[10px] text-red-400 hover:text-red-300 font-mono underline cursor-pointer"
+                      onClick={() => setPrintPaperSize("A4")}
+                      className={`py-1.5 rounded border transition-all cursor-pointer ${
+                        printPaperSize === "A4"
+                          ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
+                          : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                      }`}
                     >
-                      Hapus Logo
+                      Kertas A4
+                    </button>
+                    <button
+                      onClick={() => setPrintPaperSize("A3")}
+                      className={`py-1.5 rounded border transition-all cursor-pointer ${
+                        printPaperSize === "A3"
+                          ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
+                          : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Kertas A3 (Besar)
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Scale text input */}
-              <div>
-                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Skala Peta (Teks)
-                </label>
-                <input
-                  type="text"
-                  value={printScaleText}
-                  onChange={(e) => setPrintScaleText(e.target.value)}
-                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
-                  placeholder="Contoh: 1:25.000"
-                />
-              </div>
-
-              {/* Source / Creator text input */}
-              <div>
-                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Sumber / Pembuat Peta
-                </label>
-                <input
-                  type="text"
-                  value={printSourceText}
-                  onChange={(e) => setPrintSourceText(e.target.value)}
-                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
-                  placeholder="Contoh: Sumber: Bappeda Kota Banda Aceh"
-                />
-              </div>
-
-              {/* Paper size selection */}
-              <div>
-                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Ukuran Kertas
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <button
-                    onClick={() => setPrintPaperSize("A4")}
-                    className={`py-1.5 rounded border transition-all cursor-pointer ${
-                      printPaperSize === "A4"
-                        ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
-                        : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Kertas A4
-                  </button>
-                  <button
-                    onClick={() => setPrintPaperSize("A3")}
-                    className={`py-1.5 rounded border transition-all cursor-pointer ${
-                      printPaperSize === "A3"
-                        ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
-                        : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Kertas A3 (Besar)
-                  </button>
+                {/* Orientation selection */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Orientasi Halaman
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <button
+                      onClick={() => setPrintOrientation("landscape")}
+                      className={`py-1.5 rounded border transition-all cursor-pointer ${
+                        printOrientation === "landscape"
+                          ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
+                          : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Landscape
+                    </button>
+                    <button
+                      onClick={() => setPrintOrientation("portrait")}
+                      className={`py-1.5 rounded border transition-all cursor-pointer ${
+                        printOrientation === "portrait"
+                          ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
+                          : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Portrait
+                    </button>
+                  </div>
                 </div>
               </div>
+            ) : (
+              <div className="flex flex-col gap-3 overflow-y-auto max-h-[55vh] pr-1 scrollbar-thin">
+                {/* Add new element buttons */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1.5 font-mono">
+                    Tambah Objek Baru ke Peta
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5 text-xs font-mono">
+                    <button
+                      onClick={handleAddTextElement}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-[#334155] transition-all cursor-pointer text-[11px]"
+                    >
+                      <Type className="w-3.5 h-3.5 text-sky-400" />
+                      Teks
+                    </button>
+                    <button
+                      onClick={handleAddLineElement}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-[#334155] transition-all cursor-pointer text-[11px]"
+                    >
+                      <Slash className="w-3.5 h-3.5 text-red-400" />
+                      Garis
+                    </button>
+                    <button
+                      onClick={handleAddRectangleElement}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-[#334155] transition-all cursor-pointer text-[11px]"
+                    >
+                      <Square className="w-3.5 h-3.5 text-emerald-400" />
+                      Persegi
+                    </button>
+                    <button
+                      onClick={handleAddImageElement}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-[#334155] transition-all cursor-pointer text-[11px]"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                      Gambar
+                    </button>
+                  </div>
+                </div>
 
-              {/* Orientation selection */}
-              <div>
-                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Orientasi Halaman
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <button
-                    onClick={() => setPrintOrientation("landscape")}
-                    className={`py-1.5 rounded border transition-all cursor-pointer ${
-                      printOrientation === "landscape"
-                        ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
-                        : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Landscape
-                  </button>
-                  <button
-                    onClick={() => setPrintOrientation("portrait")}
-                    className={`py-1.5 rounded border transition-all cursor-pointer ${
-                      printOrientation === "portrait"
-                        ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
-                        : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Portrait
-                  </button>
+                {/* Edit Selected Element Properties */}
+                {(() => {
+                  const el = printLayoutElements.find(item => item.id === selectedElementId);
+                  if (!el) {
+                    return (
+                      <div className="bg-slate-900/40 border border-[#334155]/40 rounded-lg p-2.5 text-center text-xs text-slate-400 font-mono">
+                        Pilih objek di kertas atau daftar di bawah untuk mengeditnya.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="bg-[#1e293b]/70 border border-[#334155] rounded-lg p-2.5 flex flex-col gap-2">
+                      <div className="flex justify-between items-center border-b border-[#334155] pb-1.5">
+                        <span className="text-[10px] text-sky-400 font-bold uppercase font-mono tracking-wider">
+                          Edit: {el.type.toUpperCase()}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setPrintLayoutElements(prev => prev.filter(item => item.id !== el.id));
+                            setSelectedElementId(null);
+                          }}
+                          className="text-red-400 hover:text-red-300 p-1 hover:bg-red-500/10 rounded transition-all cursor-pointer"
+                          title="Hapus objek"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Position X and Y percentage sliders */}
+                      <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                        <div>
+                          <span className="text-slate-400">Posisi X: {el.x}%</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={el.x}
+                            onChange={(e) => updateSelectedElement({ x: parseInt(e.target.value) })}
+                            className="w-full accent-sky-500 cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Posisi Y: {el.y}%</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={el.y}
+                            onChange={(e) => updateSelectedElement({ y: parseInt(e.target.value) })}
+                            className="w-full accent-sky-500 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Type-Specific Properties */}
+                      {el.type === "text" && (
+                        <div className="flex flex-col gap-2 text-xs">
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Isi Teks</span>
+                            <input
+                              type="text"
+                              value={el.content || ""}
+                              onChange={(e) => updateSelectedElement({ content: e.target.value })}
+                              className="w-full bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] font-mono"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Ukuran Font ({el.fontSize}px)</span>
+                            <input
+                              type="range"
+                              min="8"
+                              max="120"
+                              value={el.fontSize || 14}
+                              onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) })}
+                              className="w-full accent-sky-500 cursor-pointer"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Warna Teks</span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={el.fontColor || "#000000"}
+                                onChange={(e) => updateSelectedElement({ fontColor: e.target.value })}
+                                className="w-8 h-7 bg-transparent border-0 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={el.fontColor || "#000000"}
+                                onChange={(e) => updateSelectedElement({ fontColor: e.target.value })}
+                                className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {el.type === "line" && (
+                        <div className="flex flex-col gap-2 text-xs">
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Panjang Garis ({el.width}px)</span>
+                            <input
+                              type="range"
+                              min="10"
+                              max="600"
+                              value={el.width || 100}
+                              onChange={(e) => updateSelectedElement({ width: parseInt(e.target.value) })}
+                              className="w-full accent-sky-500 cursor-pointer"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Ketebalan ({el.lineWidth}px)</span>
+                            <input
+                              type="range"
+                              min="1"
+                              max="20"
+                              value={el.lineWidth || 2}
+                              onChange={(e) => updateSelectedElement({ lineWidth: parseInt(e.target.value) })}
+                              className="w-full accent-sky-500 cursor-pointer"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Rotasi ({el.rotation || 0}°)</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              value={el.rotation || 0}
+                              onChange={(e) => updateSelectedElement({ rotation: parseInt(e.target.value) })}
+                              className="w-full accent-sky-500 cursor-pointer"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Warna Garis</span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={el.lineColor || "#ff0000"}
+                                onChange={(e) => updateSelectedElement({ lineColor: e.target.value })}
+                                className="w-8 h-7 bg-transparent border-0 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={el.lineColor || "#ff0000"}
+                                onChange={(e) => updateSelectedElement({ lineColor: e.target.value })}
+                                className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {el.type === "rectangle" && (
+                        <div className="flex flex-col gap-2 text-xs">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Lebar ({el.width}px)</span>
+                              <input
+                                type="range"
+                                min="10"
+                                max="600"
+                                value={el.width || 120}
+                                onChange={(e) => updateSelectedElement({ width: parseInt(e.target.value) })}
+                                className="w-full accent-sky-500 cursor-pointer"
+                              />
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Tinggi ({el.height}px)</span>
+                              <input
+                                type="range"
+                                min="10"
+                                max="400"
+                                value={el.height || 60}
+                                onChange={(e) => updateSelectedElement({ height: parseInt(e.target.value) })}
+                                className="w-full accent-sky-500 cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Tebal Bingkai ({el.rectBorderWidth}px)</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="20"
+                              value={el.rectBorderWidth === undefined ? 2 : el.rectBorderWidth}
+                              onChange={(e) => updateSelectedElement({ rectBorderWidth: parseInt(e.target.value) })}
+                              className="w-full accent-sky-500 cursor-pointer"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Warna Bingkai</span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={el.rectBorderColor || "#000000"}
+                                onChange={(e) => updateSelectedElement({ rectBorderColor: e.target.value })}
+                                className="w-8 h-7 bg-transparent border-0 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={el.rectBorderColor || "#000000"}
+                                onChange={(e) => updateSelectedElement({ rectBorderColor: e.target.value })}
+                                className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Warna Latar (Fill)</span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={el.rectFillColor && el.rectFillColor.startsWith("rgba") ? "#ffffff" : el.rectFillColor || "#ffffff"}
+                                onChange={(e) => updateSelectedElement({ rectFillColor: e.target.value })}
+                                className="w-8 h-7 bg-transparent border-0 cursor-pointer"
+                                disabled={el.rectFillColor === "rgba(0,0,0,0)"}
+                              />
+                              <select
+                                value={el.rectFillColor === "rgba(0,0,0,0)" ? "transparan" : "solid"}
+                                onChange={(e) => {
+                                  if (e.target.value === "transparan") {
+                                    updateSelectedElement({ rectFillColor: "rgba(0,0,0,0)" });
+                                  } else {
+                                    updateSelectedElement({ rectFillColor: "#ffffff" });
+                                  }
+                                }}
+                                className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs font-mono text-slate-200 focus:outline-none"
+                              >
+                                <option value="solid font-mono">Isi Warna Solid</option>
+                                <option value="transparan font-mono">Transparan (Tanpa Latar)</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {el.type === "image" && (
+                        <div className="flex flex-col gap-2 text-xs">
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Preset Gambar / Kompas</span>
+                            <select
+                              value={el.imageUrl === CLASSIC_NORTH_ARROW ? "classic" : el.imageUrl === MODERN_NORTH_ARROW ? "modern" : "custom"}
+                              onChange={(e) => {
+                                if (e.target.value === "classic") {
+                                  updateSelectedElement({ imageUrl: CLASSIC_NORTH_ARROW });
+                                } else if (e.target.value === "modern") {
+                                  updateSelectedElement({ imageUrl: MODERN_NORTH_ARROW });
+                                } else {
+                                  updateSelectedElement({ imageUrl: "" });
+                                }
+                              }}
+                              className="w-full bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs font-mono text-slate-200 mb-1.5 focus:outline-none"
+                            >
+                              <option value="classic">Kompas Klasik (North Arrow 1)</option>
+                              <option value="modern">Kompas Modern (North Arrow 2)</option>
+                              <option value="custom">Gambar Kustom (Upload)</option>
+                            </select>
+                            
+                            {(el.imageUrl !== CLASSIC_NORTH_ARROW && el.imageUrl !== MODERN_NORTH_ARROW) && (
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleUploadElementImage(e, el.id)}
+                                className="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-sky-500/10 file:text-sky-400 cursor-pointer"
+                              />
+                            )}
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Lebar ({el.width}px)</span>
+                              <input
+                                type="range"
+                                min="10"
+                                max="400"
+                                value={el.width || 60}
+                                onChange={(e) => updateSelectedElement({ width: parseInt(e.target.value) })}
+                                className="w-full accent-sky-500 cursor-pointer"
+                              />
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Tinggi ({el.height}px)</span>
+                              <input
+                                type="range"
+                                min="10"
+                                max="400"
+                                value={el.height || 60}
+                                onChange={(e) => updateSelectedElement({ height: parseInt(e.target.value) })}
+                                className="w-full accent-sky-500 cursor-pointer"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Rotasi ({el.rotation || 0}°)</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              value={el.rotation || 0}
+                              onChange={(e) => updateSelectedElement({ rotation: parseInt(e.target.value) })}
+                              className="w-full accent-sky-500 cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* List of current dynamic elements */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Daftar Objek Tambahan ({printLayoutElements.length})
+                  </label>
+                  <div className="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1 scrollbar-thin text-xs font-mono">
+                    {printLayoutElements.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedElementId(item.id)}
+                        className={`flex justify-between items-center px-2 py-1.5 rounded border transition-all cursor-pointer ${
+                          selectedElementId === item.id
+                            ? "bg-[#38bdf8]/10 border-[#38bdf8] text-white font-bold"
+                            : "bg-slate-900/60 border-[#334155]/60 text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="text-[10px] font-mono text-slate-500">{idx + 1}.</span>
+                          {item.type === "text" && <Type className="w-3.5 h-3.5 shrink-0 text-sky-400" />}
+                          {item.type === "line" && <Slash className="w-3.5 h-3.5 shrink-0 text-red-400" />}
+                          {item.type === "rectangle" && <Square className="w-3.5 h-3.5 shrink-0 text-emerald-400" />}
+                          {item.type === "image" && <ImageIcon className="w-3.5 h-3.5 shrink-0 text-amber-400" />}
+                          <span className="truncate leading-none text-[11px]">
+                            {item.type === "text" ? item.content : `${item.type.toUpperCase()} (X:${item.x}%, Y:${item.y}%)`}
+                          </span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPrintLayoutElements(prev => prev.filter(p => p.id !== item.id));
+                            if (selectedElementId === item.id) setSelectedElementId(null);
+                          }}
+                          className="text-slate-500 hover:text-red-400 p-0.5 rounded"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {printLayoutElements.length === 0 && (
+                      <div className="text-center text-[10px] text-slate-500 italic py-2">
+                        Belum ada objek tambahan.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Control buttons */}
             <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-[#334155]">
               <button
-                onClick={() => window.print()}
+                onClick={handlePrintPDF}
                 disabled={!capturedMapUrl}
                 className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/40 disabled:cursor-not-allowed text-white font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-900/20"
               >
@@ -2870,6 +3659,94 @@ export default function MapContainer({
                   <div className="absolute bottom-2 right-2 bg-white/80 border border-black px-2 py-1 text-[7px] font-mono font-bold rounded pointer-events-none select-none text-black max-w-[180px] text-right leading-tight">
                     {printSourceText || "Sumber: Bappeda Banda Aceh"}
                   </div>
+
+                  {/* Dynamic Print Layout Overlay Elements */}
+                  {printLayoutElements.map((el) => {
+                    const isSelected = el.id === selectedElementId;
+                    
+                    return (
+                      <div
+                        key={el.id}
+                        onMouseDown={(e) => startDrag(e, el.id)}
+                        onTouchStart={(e) => startTouchDrag(e, el.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedElementId(el.id);
+                        }}
+                        className={`absolute select-none cursor-move group transition-all duration-75 ${
+                          isSelected 
+                            ? "ring-2 ring-sky-400 ring-offset-1 print:ring-0 print:ring-offset-0 z-50" 
+                            : "hover:ring-1 hover:ring-slate-400 z-40"
+                        }`}
+                        style={{
+                          left: `${el.x}%`,
+                          top: `${el.y}%`,
+                          transform: "translate(-50%, -50%)",
+                          padding: "4px",
+                          borderRadius: "2px"
+                        }}
+                      >
+                        {/* Selector badge */}
+                        {isSelected && (
+                          <div className="absolute -top-2.5 -right-2.5 w-4 h-4 bg-sky-500 rounded-full border border-white flex items-center justify-center text-[8px] font-bold text-white print:hidden shadow-md">
+                            ✓
+                          </div>
+                        )}
+                        
+                        {el.type === "text" && (
+                          <div
+                            style={{
+                              fontSize: `${el.fontSize || 14}px`,
+                              color: el.fontColor || "#000000",
+                              fontWeight: "bold",
+                              whiteSpace: "nowrap",
+                              fontFamily: "var(--font-sans)"
+                            }}
+                          >
+                            {el.content}
+                          </div>
+                        )}
+
+                        {el.type === "line" && (
+                          <div
+                            style={{
+                              width: `${el.width || 100}px`,
+                              height: `${el.lineWidth || 2}px`,
+                              backgroundColor: el.lineColor || "#ff0000",
+                              transform: `rotate(${el.rotation || 0}deg)`,
+                              transformOrigin: "center"
+                            }}
+                          />
+                        )}
+
+                        {el.type === "rectangle" && (
+                          <div
+                            style={{
+                              width: `${el.width || 120}px`,
+                              height: `${el.height || 60}px`,
+                              backgroundColor: el.rectFillColor || "rgba(255,255,255,0.7)",
+                              border: `${el.rectBorderWidth === undefined ? 2 : el.rectBorderWidth}px solid ${el.rectBorderColor || "#000000"}`
+                            }}
+                          />
+                        )}
+
+                        {el.type === "image" && el.imageUrl && (
+                          <img
+                            src={el.imageUrl}
+                            alt="Overlay element"
+                            referrerPolicy="no-referrer"
+                            style={{
+                              width: `${el.width || 60}px`,
+                              height: `${el.height || 60}px`,
+                              transform: `rotate(${el.rotation || 0}deg)`,
+                              transformOrigin: "center",
+                              objectFit: "contain"
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* B. KOP KARTOGRAFI SECTION (Title block & legend) */}

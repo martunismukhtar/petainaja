@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Layers,
   MapPin,
@@ -56,6 +56,7 @@ interface SidebarProps {
   onCreateWmsLayer?: (name: string, url: string, layersParam: string) => void;
   onRenameLayer?: (id: string, newName: string) => void;
   onDeleteFeature?: (layerId: string, featureIndex: number) => void;
+  onUpdateFeatureProperties?: (layerId: string, featureIndex: number, properties: Record<string, any>) => void;
 }
 
 export default function Sidebar({
@@ -85,7 +86,8 @@ export default function Sidebar({
   onEditFeature,
   onCreateWmsLayer,
   onRenameLayer,
-  onDeleteFeature
+  onDeleteFeature,
+  onUpdateFeatureProperties
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeLayerConfigId, setActiveLayerConfigId] = useState<LayerId | string | null>(null);
@@ -119,6 +121,58 @@ export default function Sidebar({
 
   const toggleSection = (section: string) => {
     setExpandedSection((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Local state for dynamic attribute editing
+  const [editingProperties, setEditingProperties] = useState<Record<string, any> | null>(null);
+  const [newAttrKey, setNewAttrKey] = useState("");
+  const [newAttrVal, setNewAttrVal] = useState("");
+  const [attrSuccessMsg, setAttrSuccessMsg] = useState("");
+
+  useEffect(() => {
+    if (clickedFeature) {
+      setEditingProperties({ ...clickedFeature.properties });
+      setNewAttrKey("");
+      setNewAttrVal("");
+      setAttrSuccessMsg("");
+    } else {
+      setEditingProperties(null);
+    }
+  }, [clickedFeature]);
+
+  const handleUpdatePropertyLocal = (key: string, value: any) => {
+    if (!editingProperties) return;
+    setEditingProperties({
+      ...editingProperties,
+      [key]: value
+    });
+  };
+
+  const handleDeletePropertyLocal = (key: string) => {
+    if (!editingProperties) return;
+    const updated = { ...editingProperties };
+    delete updated[key];
+    setEditingProperties(updated);
+  };
+
+  const handleAddPropertyLocal = () => {
+    if (!editingProperties || !newAttrKey.trim()) return;
+    const formattedKey = newAttrKey.trim().replace(/\s+/g, "_");
+    setEditingProperties({
+      ...editingProperties,
+      [formattedKey]: newAttrVal.trim()
+    });
+    setNewAttrKey("");
+    setNewAttrVal("");
+  };
+
+  const handleSavePropertiesToServer = () => {
+    if (!clickedFeature || !clickedFeature.layerId || clickedFeature.featureIndex === undefined || !editingProperties) return;
+    onUpdateFeatureProperties?.(clickedFeature.layerId as string, clickedFeature.featureIndex, editingProperties);
+    setAttrSuccessMsg("Atribut berhasil disimpan!");
+    setTimeout(() => {
+      setAttrSuccessMsg("");
+    }, 2000);
   };
 
   // Filter layers or search inside feature attributes (if applicable)
@@ -707,33 +761,99 @@ export default function Sidebar({
                         {clickedFeature.layerName}
                       </span>
                       <h4 className="font-bold text-xs text-white mt-2">
-                        {clickedFeature.properties.name || "Fitur Tanpa Nama"}
+                        {editingProperties?.name || clickedFeature.properties.name || "Fitur Tanpa Nama"}
                       </h4>
                     </div>
                     <button
                       onClick={onCloseFeatureInfo}
-                      className="text-slate-400 hover:text-white text-xs px-1 hover:bg-[#1e293b] rounded font-bold"
+                      className="text-slate-400 hover:text-white text-xs px-1 hover:bg-[#1e293b] rounded font-bold cursor-pointer"
                     >
                       ✕
                     </button>
                   </div>
 
-                  {/* Attributes Key-Value List */}
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                    {Object.entries(clickedFeature.properties).map(([key, val]) => {
-                      if (key === "name" || key === "color") return null;
+                  {/* Attributes Key-Value Editor List */}
+                  <div className="space-y-2.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                    {editingProperties && Object.entries(editingProperties).map(([key, val]) => {
+                      if (key === "color") return null;
                       return (
-                        <div key={key} className="flex justify-between items-center text-[11px] py-1 border-b border-[#334155]/30">
-                          <span className="text-slate-400 font-mono uppercase text-[9px] tracking-wider">
-                            {key.replace("_", " ")}
-                          </span>
-                          <span className="text-slate-200 font-medium font-sans truncate ml-2 max-w-[150px]">
-                            {String(val)}
-                          </span>
+                        <div key={key} className="flex flex-col gap-1 pb-1.5 border-b border-[#334155]/20">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 font-mono uppercase text-[9px] tracking-wider truncate mr-1" title={key}>
+                              {key.replace("_", " ")}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePropertyLocal(key)}
+                              className="p-0.5 text-slate-500 hover:text-red-400 rounded hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Hapus Atribut"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={String(val)}
+                            onChange={(e) => handleUpdatePropertyLocal(key, e.target.value)}
+                            className="w-full bg-[#0f172a] border border-[#334155] rounded px-2 py-1 text-slate-200 text-xs font-mono focus:outline-none focus:border-[#38bdf8] transition-colors"
+                          />
                         </div>
                       );
                     })}
+
+                    {/* Inline Form to ADD NEW ATTRIBUTE FIELD */}
+                    <div className="bg-[#0f172a]/60 border border-dashed border-[#334155] rounded-lg p-2.5 mt-2 space-y-2">
+                      <span className="text-[9px] font-bold text-[#38bdf8] uppercase font-mono block">
+                        ➕ Tambah Atribut Baru
+                      </span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="Nama Kolom"
+                            value={newAttrKey}
+                            onChange={(e) => setNewAttrKey(e.target.value)}
+                            className="w-full bg-[#0f172a] border border-[#334155] rounded px-2 py-1 text-slate-300 text-[10px] font-mono focus:outline-none focus:border-[#38bdf8]"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="Nilai Atribut"
+                            value={newAttrVal}
+                            onChange={(e) => setNewAttrVal(e.target.value)}
+                            className="w-full bg-[#0f172a] border border-[#334155] rounded px-2 py-1 text-slate-300 text-[10px] font-mono focus:outline-none focus:border-[#38bdf8]"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddPropertyLocal}
+                        disabled={!newAttrKey.trim()}
+                        className="w-full py-1 bg-[#38bdf8]/15 hover:bg-[#38bdf8]/25 disabled:opacity-50 text-[#38bdf8] text-[10px] font-bold rounded border border-[#38bdf8]/20 hover:border-[#38bdf8]/40 transition-all cursor-pointer"
+                      >
+                        Tambah ke Daftar
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Save button for edited attributes */}
+                  {clickedFeature.layerId && clickedFeature.featureIndex !== undefined && (
+                    <div className="space-y-1 pt-1.5 border-t border-[#334155]/40">
+                      <button
+                        onClick={handleSavePropertiesToServer}
+                        className="w-full py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded text-xs transition-colors shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Simpan Perubahan Atribut
+                      </button>
+                      {attrSuccessMsg && (
+                        <p className="text-[10px] font-bold text-emerald-400 text-center animate-bounce mt-1">
+                          {attrSuccessMsg}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Clicked coordinates */}
                   <div className="p-2.5 bg-[#0f172a] border border-[#334155] rounded-md">
