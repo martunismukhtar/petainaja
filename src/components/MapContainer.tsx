@@ -489,6 +489,17 @@ export default function MapContainer({
         .setLngLat(coord)
         .addTo(map);
 
+      // Disable map drag when mouse enters vertex marker so user can drag easily
+      el.addEventListener("mouseenter", () => {
+        map.dragPan.disable();
+      });
+
+      el.addEventListener("mouseleave", () => {
+        if (!isDraggingVertexRef.current) {
+          map.dragPan.enable();
+        }
+      });
+
       marker.on("dragstart", () => {
         isDraggingVertexRef.current = true;
         map.dragPan.disable();
@@ -1369,14 +1380,12 @@ export default function MapContainer({
     renderLandmarkMarkers();
     renderCustomPinMarkers();
 
-    // Prevent map dragging when the mouse is over active drawing/editing vector layers on the map
+    // Prevent map dragging when the mouse is over active drawing vector layers on the map
+    // NOTE: editing-highlight-* layers are excluded to avoid interfering with vertex marker dragging
     const activeVectorLayers = [
       "draw-temp-fill-layer",
       "draw-temp-line-layer",
       "draw-temp-circle-layer",
-      "editing-highlight-fill",
-      "editing-highlight-line",
-      "editing-highlight-circle",
       "measure-line-layer",
       "measure-points-layer",
       "buffer-fill-layer",
