@@ -1,5 +1,4 @@
-import React from "react";
-import { Compass, ShieldAlert, Cpu, CheckCircle2, Layers } from "lucide-react";
+import { Compass, Cpu, CheckCircle2, Layers } from "lucide-react";
 import type { BasemapId } from "../types";
 
 interface FooterProps {

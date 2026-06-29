@@ -19,12 +19,7 @@ import type {
 } from "./types";
 import {
   BarChart2,
-  PieChart,
-  Grid,
-  TrendingUp,
-  Map,
   X,
-  FileJson,
   CheckCircle2,
   Table,
   Download,
@@ -200,11 +195,11 @@ export default function App() {
 
   const handleRemoveLayer = (id: LayerId | string) => {
     setLayers((prev) => prev.filter((l) => l.id !== id));
-    setUploadedGeoJSONs((prev, index) => {
+    setUploadedGeoJSONs((prev: any) => {
       // Clean up the corresponding uploadedGeoJSON if we find it
       const layerIndex = layers.findIndex((l) => l.id === id);
       const isUploadedCount = layers.filter((l, idx) => l.isUploaded && idx < layerIndex).length;
-      return prev.filter((_, idx) => idx !== isUploadedCount);
+      return prev.filter((_: any, idx: number) => idx !== isUploadedCount);
     });
   };
 

@@ -108,7 +108,7 @@ export function geojsonToWktCsv(geojson: any): string {
   // Header line
   let csv = `WKT,${propKeys.map(k => `"${k}"`).join(",")}\n`;
 
-  geojson.features.forEach((feature: any, idx: number) => {
+  geojson.features.forEach((feature: any) => {
     const geom = feature.geometry || {};
     const props = feature.properties || {};
 

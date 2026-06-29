@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Map,
   FolderOpen,
@@ -11,17 +11,14 @@ import {
   FileUp,
   FolderArchive,
   Ruler,
-  Maximize2,
   Radio,
   FileJson,
   BarChart2,
   Menu,
   ChevronDown,
-  Info,
   HelpCircle,
   Sun,
   Moon,
-  TrendingUp,
   Cpu
 } from "lucide-react";
 import type { BasemapId, GisTool } from "../types";

@@ -7,25 +7,23 @@ import type {
   ClickedFeatureInfo,
   CustomPin,
   BasemapId,
-  GisTool
+  GisTool,
 } from "../types";
 import {
   BANDA_ACEH_CENTER,
   KABUPATEN_DATA,
   JALAN_DATA,
   SUNGAI_DATA,
-  LANDMARK_DATA
+  LANDMARK_DATA,
 } from "../data/geojson";
 import {
   calculateHaversineDistance,
-  generateCircularBufferGeoJSON
+  generateCircularBufferGeoJSON,
 } from "../utils/gisUtils";
 import {
   Ruler,
   Radio,
   MapPin,
-  Maximize2,
-  Minimize2,
   Trash2,
   Navigation,
   Plus,
@@ -37,7 +35,7 @@ import {
   Type,
   Square,
   Slash,
-  Image as ImageIcon
+  Image as ImageIcon,
 } from "lucide-react";
 
 export interface PrintLayoutElement {
@@ -59,15 +57,18 @@ export interface PrintLayoutElement {
   rectBorderWidth?: number; // for rectangle
 }
 
-const CLASSIC_NORTH_ARROW = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 5 L75 80 L50 65 L25 80 Z' fill='black'/><path d='M50 5 L50 65 L25 80 Z' fill='%23ccc'/><text x='50' y='98' font-family='sans-serif' font-size='18' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
+const CLASSIC_NORTH_ARROW =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 5 L75 80 L50 65 L25 80 Z' fill='black'/><path d='M50 5 L50 65 L25 80 Z' fill='%23ccc'/><text x='50' y='98' font-family='sans-serif' font-size='18' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
 
-const MODERN_NORTH_ARROW = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' stroke='black' stroke-width='2' fill='none'/><path d='M50 15 L58 50 L50 45 L42 50 Z' fill='black'/><path d='M50 85 L58 50 L50 55 L42 50 Z' fill='%23777'/><text x='50' y='12' font-family='sans-serif' font-size='14' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
+const MODERN_NORTH_ARROW =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' stroke='black' stroke-width='2' fill='none'/><path d='M50 15 L58 50 L50 45 L42 50 Z' fill='black'/><path d='M50 85 L58 50 L50 55 L42 50 Z' fill='%23777'/><text x='50' y='12' font-family='sans-serif' font-size='14' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
 
 // Basemap JSON Style URL Map
 const BASEMAP_STYLES: Record<BasemapId, string> = {
   voyager: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
   positron: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-  "dark-matter": "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+  "dark-matter":
+    "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
 };
 
 interface MapContainerProps {
@@ -87,9 +88,18 @@ interface MapContainerProps {
   onResetFlyTo: () => void;
   uploadedGeoJSONs: any[];
   drawingLayerId: string | null;
-  onSaveDrawnFeature: (layerId: string, geometry: any, properties?: any) => void;
+  onSaveDrawnFeature: (
+    layerId: string,
+    geometry: any,
+    properties?: any,
+  ) => void;
   editingFeature?: any | null;
-  onSaveEditedFeature?: (layerId: string, featureIndex: number, updatedGeometry: any, updatedProperties: any) => void;
+  onSaveEditedFeature?: (
+    layerId: string,
+    featureIndex: number,
+    updatedGeometry: any,
+    updatedProperties: any,
+  ) => void;
   onCancelEditing?: () => void;
 }
 
@@ -97,7 +107,11 @@ function getSqDist(p: [number, number], w: [number, number]) {
   return (p[0] - w[0]) ** 2 + (p[1] - w[1]) ** 2;
 }
 
-function distToSegmentSquared(p: [number, number], v: [number, number], w: [number, number]) {
+function distToSegmentSquared(
+  p: [number, number],
+  v: [number, number],
+  w: [number, number],
+) {
   const l2 = getSqDist(v, w);
   if (l2 === 0) return getSqDist(p, v);
   let t = ((p[0] - v[0]) * (w[0] - v[0]) + (p[1] - v[1]) * (w[1] - v[1])) / l2;
@@ -105,7 +119,11 @@ function distToSegmentSquared(p: [number, number], v: [number, number], w: [numb
   return getSqDist(p, [v[0] + t * (w[0] - v[0]), v[1] + t * (w[1] - v[1])]);
 }
 
-function distToSegment(p: [number, number], v: [number, number], w: [number, number]) {
+function distToSegment(
+  p: [number, number],
+  v: [number, number],
+  w: [number, number],
+) {
   return Math.sqrt(distToSegmentSquared(p, v, w));
 }
 
@@ -114,7 +132,7 @@ export default function MapContainer({
   activeBasemap,
   activeTool,
   onChangeTool,
-  clickedFeature,
+  // clickedFeature,
   onFeatureClick,
   customPins,
   onAddCustomPin,
@@ -129,7 +147,7 @@ export default function MapContainer({
   onSaveDrawnFeature,
   editingFeature,
   onSaveEditedFeature,
-  onCancelEditing
+  onCancelEditing,
 }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const miniMapContainerRef = useRef<HTMLDivElement>(null);
@@ -143,7 +161,9 @@ export default function MapContainer({
 
   // GIS Tool States
   const [measurePoints, setMeasurePoints] = useState<[number, number][]>([]);
-  const [bufferCenter, setBufferCenter] = useState<[number, number] | null>(null);
+  const [bufferCenter, setBufferCenter] = useState<[number, number] | null>(
+    null,
+  );
   const [bufferRadius, setBufferRadius] = useState<number>(1.0); // radius in km
 
   // Interactive Feature Drawing States
@@ -151,11 +171,13 @@ export default function MapContainer({
   const [sessionFeatures, setSessionFeatures] = useState<any[]>([]);
   const [drawProperties, setDrawProperties] = useState<Record<string, any>>({
     nama: "Fitur Baru",
-    keterangan: "Dibuat secara interaktif"
+    keterangan: "Dibuat secara interaktif",
   });
 
   // Dialog state for adding pin
-  const [pinDialogCoords, setPinDialogCoords] = useState<[number, number] | null>(null);
+  const [pinDialogCoords, setPinDialogCoords] = useState<
+    [number, number] | null
+  >(null);
   const [newPinName, setNewPinName] = useState("");
   const [newPinCategory, setNewPinCategory] = useState("Fasilitas");
   const [newPinDesc, setNewPinDesc] = useState("");
@@ -166,29 +188,45 @@ export default function MapContainer({
   // Print & Layout States
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printTitle, setPrintTitle] = useState("PETA SPASIAL KOTA BANDA ACEH");
-  const [printSubtitle, setPrintSubtitle] = useState("Badan Perencanaan Pembangunan Daerah Kota Banda Aceh");
+  const [printSubtitle, setPrintSubtitle] = useState(
+    "Badan Perencanaan Pembangunan Daerah Kota Banda Aceh",
+  );
   const [printPaperSize, setPrintPaperSize] = useState<"A4" | "A3">("A4");
-  const [printOrientation, setPrintOrientation] = useState<"landscape" | "portrait">("landscape");
+  const [printOrientation, setPrintOrientation] = useState<
+    "landscape" | "portrait"
+  >("landscape");
   const [capturedMapUrl, setCapturedMapUrl] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [printLogo, setPrintLogo] = useState<string | null>(null);
   const [printScaleText, setPrintScaleText] = useState("1:25.000");
-  const [printSourceText, setPrintSourceText] = useState("Sumber: Badan Perencanaan Pembangunan Daerah Kota Banda Aceh");
-  const [printGovernmentName, setPrintGovernmentName] = useState("PEMERINTAH KOTA");
+  const [printSourceText, setPrintSourceText] = useState(
+    "Sumber: Badan Perencanaan Pembangunan Daerah Kota Banda Aceh",
+  );
+  const [printGovernmentName, setPrintGovernmentName] =
+    useState("PEMERINTAH KOTA");
   const [printRegionName, setPrintRegionName] = useState("BANDA ACEH");
-  const [printProvinceName, setPrintProvinceName] = useState("Provinsi Aceh, Indonesia");
+  const [printProvinceName, setPrintProvinceName] = useState(
+    "Provinsi Aceh, Indonesia",
+  );
   const [printShowLegend, setPrintShowLegend] = useState(true);
   const [printShowScale, setPrintShowScale] = useState(true);
   const [printShowCompass, setPrintShowCompass] = useState(true);
   const [printScaleBarKm, setPrintScaleBarKm] = useState("3 km");
-  const [printProjection, setPrintProjection] = useState("SISTEM PROYEKSI: UTM ZONE 46N");
+  const [printProjection, setPrintProjection] = useState(
+    "SISTEM PROYEKSI: UTM ZONE 46N",
+  );
   const [printDatum, setPrintDatum] = useState("WGS 84 / UTM 46N");
-  const [printCartographer, setPrintCartographer] = useState("Bappeda Banda Aceh");
+  const [printCartographer, setPrintCartographer] =
+    useState("Bappeda Banda Aceh");
   const printLogoInputRef = useRef<HTMLInputElement>(null);
 
   // Dynamic layout print elements
-  const [printSidebarTab, setPrintSidebarTab] = useState<"info" | "elements">("info");
-  const [printLayoutElements, setPrintLayoutElements] = useState<PrintLayoutElement[]>([
+  const [printSidebarTab, setPrintSidebarTab] = useState<"info" | "elements">(
+    "info",
+  );
+  const [printLayoutElements, setPrintLayoutElements] = useState<
+    PrintLayoutElement[]
+  >([
     {
       id: "preset-north",
       type: "image",
@@ -196,99 +234,111 @@ export default function MapContainer({
       y: 12,
       width: 50,
       height: 50,
-      imageUrl: CLASSIC_NORTH_ARROW
-    }
+      imageUrl: CLASSIC_NORTH_ARROW,
+    },
   ]);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(
+    null,
+  );
 
   // Drag handlers for print layout elements
   const startDrag = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    const element = printLayoutElements.find(el => el.id === id);
+
+    const element = printLayoutElements.find((el) => el.id === id);
     if (!element) return;
-    
+
     setSelectedElementId(id);
-    
+
     const paperEl = document.getElementById("print-layout-paper");
     if (!paperEl) return;
-    
+
     const rect = paperEl.getBoundingClientRect();
     const startX = e.clientX;
     const startY = e.clientY;
     const startXPercent = element.x;
     const startYPercent = element.y;
-    
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
       const dxPercent = (dx / rect.width) * 100;
       const dyPercent = (dy / rect.height) * 100;
-      
-      const newX = Math.round(Math.max(0, Math.min(100, startXPercent + dxPercent)));
-      const newY = Math.round(Math.max(0, Math.min(100, startYPercent + dyPercent)));
-      
-      setPrintLayoutElements(prev =>
-        prev.map(el => (el.id === id ? { ...el, x: newX, y: newY } : el))
+
+      const newX = Math.round(
+        Math.max(0, Math.min(100, startXPercent + dxPercent)),
+      );
+      const newY = Math.round(
+        Math.max(0, Math.min(100, startYPercent + dyPercent)),
+      );
+
+      setPrintLayoutElements((prev) =>
+        prev.map((el) => (el.id === id ? { ...el, x: newX, y: newY } : el)),
       );
     };
-    
+
     const handleMouseUp = () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-    
+
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
   };
 
   const startTouchDrag = (e: React.TouchEvent, id: string) => {
     e.stopPropagation();
-    
-    const element = printLayoutElements.find(el => el.id === id);
+
+    const element = printLayoutElements.find((el) => el.id === id);
     if (!element) return;
-    
+
     setSelectedElementId(id);
-    
+
     const paperEl = document.getElementById("print-layout-paper");
     if (!paperEl) return;
-    
+
     const rect = paperEl.getBoundingClientRect();
     const touch = e.touches[0];
     const startX = touch.clientX;
     const startY = touch.clientY;
     const startXPercent = element.x;
     const startYPercent = element.y;
-    
+
     const handleTouchMove = (moveEvent: TouchEvent) => {
       const currentTouch = moveEvent.touches[0];
       const dx = currentTouch.clientX - startX;
       const dy = currentTouch.clientY - startY;
       const dxPercent = (dx / rect.width) * 100;
       const dyPercent = (dy / rect.height) * 100;
-      
-      const newX = Math.round(Math.max(0, Math.min(100, startXPercent + dxPercent)));
-      const newY = Math.round(Math.max(0, Math.min(100, startYPercent + dyPercent)));
-      
-      setPrintLayoutElements(prev =>
-        prev.map(el => (el.id === id ? { ...el, x: newX, y: newY } : el))
+
+      const newX = Math.round(
+        Math.max(0, Math.min(100, startXPercent + dxPercent)),
+      );
+      const newY = Math.round(
+        Math.max(0, Math.min(100, startYPercent + dyPercent)),
+      );
+
+      setPrintLayoutElements((prev) =>
+        prev.map((el) => (el.id === id ? { ...el, x: newX, y: newY } : el)),
       );
     };
-    
+
     const handleTouchEnd = () => {
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
     };
-    
+
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("touchend", handleTouchEnd);
   };
 
   const updateSelectedElement = (updates: Partial<PrintLayoutElement>) => {
     if (!selectedElementId) return;
-    setPrintLayoutElements(prev =>
-      prev.map(el => (el.id === selectedElementId ? { ...el, ...updates } : el))
+    setPrintLayoutElements((prev) =>
+      prev.map((el) =>
+        el.id === selectedElementId ? { ...el, ...updates } : el,
+      ),
     );
   };
 
@@ -300,9 +350,9 @@ export default function MapContainer({
       y: 50,
       content: "Teks Baru",
       fontSize: 16,
-      fontColor: "#000000"
+      fontColor: "#000000",
     };
-    setPrintLayoutElements(prev => [...prev, newEl]);
+    setPrintLayoutElements((prev) => [...prev, newEl]);
     setSelectedElementId(newEl.id);
   };
 
@@ -315,9 +365,9 @@ export default function MapContainer({
       width: 100, // length in px
       lineWidth: 3, // thickness in px
       lineColor: "#ff0000",
-      rotation: 0
+      rotation: 0,
     };
-    setPrintLayoutElements(prev => [...prev, newEl]);
+    setPrintLayoutElements((prev) => [...prev, newEl]);
     setSelectedElementId(newEl.id);
   };
 
@@ -331,9 +381,9 @@ export default function MapContainer({
       height: 60,
       rectFillColor: "rgba(255, 255, 255, 0.7)",
       rectBorderColor: "#000000",
-      rectBorderWidth: 2
+      rectBorderWidth: 2,
     };
-    setPrintLayoutElements(prev => [...prev, newEl]);
+    setPrintLayoutElements((prev) => [...prev, newEl]);
     setSelectedElementId(newEl.id);
   };
 
@@ -345,20 +395,25 @@ export default function MapContainer({
       y: 50,
       width: 60,
       height: 60,
-      imageUrl: CLASSIC_NORTH_ARROW
+      imageUrl: CLASSIC_NORTH_ARROW,
     };
-    setPrintLayoutElements(prev => [...prev, newEl]);
+    setPrintLayoutElements((prev) => [...prev, newEl]);
     setSelectedElementId(newEl.id);
   };
 
-  const handleUploadElementImage = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
+  const handleUploadElementImage = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    id: string,
+  ) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === "string") {
-          setPrintLayoutElements(prev =>
-            prev.map(el => (el.id === id ? { ...el, imageUrl: reader.result as string } : el))
+          setPrintLayoutElements((prev) =>
+            prev.map((el) =>
+              el.id === id ? { ...el, imageUrl: reader.result as string } : el,
+            ),
           );
         }
       };
@@ -374,7 +429,7 @@ export default function MapContainer({
     bufferRadius,
     onFeatureClick,
     sessionFeatures,
-    editingFeature
+    editingFeature,
   });
 
   useEffect(() => {
@@ -385,9 +440,17 @@ export default function MapContainer({
       bufferRadius,
       onFeatureClick,
       sessionFeatures,
-      editingFeature
+      editingFeature,
     };
-  }, [drawingLayerId, layers, activeTool, bufferRadius, onFeatureClick, sessionFeatures, editingFeature]);
+  }, [
+    drawingLayerId,
+    layers,
+    activeTool,
+    bufferRadius,
+    onFeatureClick,
+    sessionFeatures,
+    editingFeature,
+  ]);
 
   // --- 1. INITIALIZE MAIN & MINI MAP ---
   useEffect(() => {
@@ -401,7 +464,7 @@ export default function MapContainer({
       zoom: 13,
       pitch: 0,
       bearing: 0,
-      preserveDrawingBuffer: true
+      preserveDrawingBuffer: true,
     } as any);
 
     // Build Mini Map (Synchronized static overview)
@@ -411,7 +474,7 @@ export default function MapContainer({
       center: BANDA_ACEH_CENTER,
       zoom: 9,
       interactive: false,
-      attributionControl: false
+      attributionControl: false,
     });
 
     mapRef.current = mainMap;
@@ -463,7 +526,10 @@ export default function MapContainer({
     }
 
     // Mapbox custom scale control
-    mainMap.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: "metric" }), "bottom-left");
+    mainMap.addControl(
+      new maplibregl.ScaleControl({ maxWidth: 100, unit: "metric" }),
+      "bottom-left",
+    );
 
     return () => {
       if (container) {
@@ -500,13 +566,15 @@ export default function MapContainer({
       zoom: 15.5,
       essential: true,
       duration: 1800,
-      pitch: is3DMode ? 45 : 0
+      pitch: is3DMode ? 45 : 0,
     });
     onResetFlyTo();
   }, [flyToCoords]);
 
   // --- VERTEX EDITING ENGINE ---
-  const [activeEditingCoords, setActiveEditingCoords] = useState<[number, number][]>([]);
+  const [activeEditingCoords, setActiveEditingCoords] = useState<
+    [number, number][]
+  >([]);
   const [editProperties, setEditProperties] = useState<Record<string, any>>({});
   const editingMarkersRef = useRef<maplibregl.Marker[]>([]);
   const isDraggingVertexRef = useRef(false);
@@ -528,11 +596,16 @@ export default function MapContainer({
 
   // --- DRAGGING EFFECT FOR DRAWING MODAL ---
   const handleDrawDragMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('input, button, select, textarea, [role="button"]')) return;
+    if (
+      (e.target as HTMLElement).closest(
+        'input, button, select, textarea, [role="button"]',
+      )
+    )
+      return;
     setIsDrawDragging(true);
     setDrawDragStart({
       x: e.clientX - drawDragOffset.x,
-      y: e.clientY - drawDragOffset.y
+      y: e.clientY - drawDragOffset.y,
     });
   };
 
@@ -542,7 +615,7 @@ export default function MapContainer({
     const handleMouseMove = (e: MouseEvent) => {
       setDrawDragOffset({
         x: e.clientX - drawDragStart.x,
-        y: e.clientY - drawDragStart.y
+        y: e.clientY - drawDragStart.y,
       });
     };
 
@@ -560,11 +633,16 @@ export default function MapContainer({
 
   // --- DRAGGING EFFECT FOR VERTEX EDITING MODAL ---
   const handleEditDragMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('input, button, select, textarea, [role="button"]')) return;
+    if (
+      (e.target as HTMLElement).closest(
+        'input, button, select, textarea, [role="button"]',
+      )
+    )
+      return;
     setIsEditDragging(true);
     setEditDragStart({
       x: e.clientX - editDragOffset.x,
-      y: e.clientY - editDragOffset.y
+      y: e.clientY - editDragOffset.y,
     });
   };
 
@@ -574,7 +652,7 @@ export default function MapContainer({
     const handleMouseMove = (e: MouseEvent) => {
       setEditDragOffset({
         x: e.clientX - editDragStart.x,
-        y: e.clientY - editDragStart.y
+        y: e.clientY - editDragStart.y,
       });
     };
 
@@ -592,11 +670,16 @@ export default function MapContainer({
 
   // --- DRAGGING EFFECT FOR PIN CREATION POPUP DIALOG ---
   const handlePinDragMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('input, button, select, textarea, [role="button"]')) return;
+    if (
+      (e.target as HTMLElement).closest(
+        'input, button, select, textarea, [role="button"]',
+      )
+    )
+      return;
     setIsPinDragging(true);
     setPinDragStart({
       x: e.clientX - pinDragOffset.x,
-      y: e.clientY - pinDragOffset.y
+      y: e.clientY - pinDragOffset.y,
     });
   };
 
@@ -606,7 +689,7 @@ export default function MapContainer({
     const handleMouseMove = (e: MouseEvent) => {
       setPinDragOffset({
         x: e.clientX - pinDragStart.x,
-        y: e.clientY - pinDragStart.y
+        y: e.clientY - pinDragStart.y,
       });
     };
 
@@ -632,7 +715,7 @@ export default function MapContainer({
     map: maplibregl.Map,
     coordsList: [number, number][],
     layerType: string,
-    geomType: string
+    geomType: string,
   ) => {
     editingMarkersRef.current.forEach((m) => m.remove());
     editingMarkersRef.current = [];
@@ -640,34 +723,38 @@ export default function MapContainer({
     const currentCoords = [...coordsList];
 
     const updateVisualEditLayer = (list: [number, number][]) => {
-      const src = map.getSource("editing-highlight-source") as maplibregl.GeoJSONSource;
+      const src = map.getSource(
+        "editing-highlight-source",
+      ) as maplibregl.GeoJSONSource;
       if (!src) return;
 
       let drawGeom: any = null;
       if (layerType === "circle" || geomType === "Point") {
         drawGeom = {
           type: "Point",
-          coordinates: list[0] || [0, 0]
+          coordinates: list[0] || [0, 0],
         };
       } else if (layerType === "line" || geomType === "LineString") {
         drawGeom = {
           type: "LineString",
-          coordinates: list
+          coordinates: list,
         };
       } else if (layerType === "fill" || geomType === "Polygon") {
         drawGeom = {
           type: "Polygon",
-          coordinates: list.length >= 3 ? [[...list, list[0]]] : []
+          coordinates: list.length >= 3 ? [[...list, list[0]]] : [],
         };
       }
 
       src.setData({
         type: "FeatureCollection",
-        features: [{
-          type: "Feature",
-          geometry: drawGeom,
-          properties: {}
-        }]
+        features: [
+          {
+            type: "Feature",
+            geometry: drawGeom,
+            properties: {},
+          },
+        ],
       });
     };
 
@@ -675,22 +762,27 @@ export default function MapContainer({
 
     currentCoords.forEach((coord, idx) => {
       const el = document.createElement("div");
-      el.className = "w-6 h-6 bg-orange-500 border-2 border-white rounded-full shadow-lg cursor-move hover:scale-125 transition-transform flex items-center justify-center text-[10px] text-white font-bold font-mono select-none";
+      el.className =
+        "w-6 h-6 bg-orange-500 border-2 border-white rounded-full shadow-lg cursor-move hover:scale-125 transition-transform flex items-center justify-center text-[10px] text-white font-bold font-mono select-none";
       el.textContent = String(idx + 1);
-      el.title = "Seret untuk memindahkan. Klik kanan untuk menghapus vertex ini.";
+      el.title =
+        "Seret untuk memindahkan. Klik kanan untuk menghapus vertex ini.";
 
       // Right-click to delete vertex
       el.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         event.stopPropagation();
 
-        const minRequired = (geomType === "Polygon" || geomType === "MultiPolygon") ? 3 : 2;
+        const minRequired =
+          geomType === "Polygon" || geomType === "MultiPolygon" ? 3 : 2;
         if (geomType === "Point") {
           return; // Point has exactly 1 vertex and cannot be deleted
         }
 
         if (currentCoords.length <= minRequired) {
-          alert(`Tidak dapat menghapus vertex. Minimal diperlukan ${minRequired} vertex untuk tipe geometri ini.`);
+          alert(
+            `Tidak dapat menghapus vertex. Minimal diperlukan ${minRequired} vertex untuk tipe geometri ini.`,
+          );
           return;
         }
 
@@ -701,7 +793,7 @@ export default function MapContainer({
 
       const marker = new maplibregl.Marker({
         element: el,
-        draggable: true
+        draggable: true,
       })
         .setLngLat(coord)
         .addTo(map);
@@ -748,7 +840,9 @@ export default function MapContainer({
     editingMarkersRef.current.forEach((m) => m.remove());
     editingMarkersRef.current = [];
 
-    const editSource = map.getSource("editing-highlight-source") as maplibregl.GeoJSONSource;
+    const editSource = map.getSource(
+      "editing-highlight-source",
+    ) as maplibregl.GeoJSONSource;
     if (editSource) {
       editSource.setData({ type: "FeatureCollection", features: [] });
     }
@@ -793,7 +887,9 @@ export default function MapContainer({
         // 1. Custom vector layers cleanup
         style.layers.forEach((mapL) => {
           if (mapL.id.startsWith("custom-layer-")) {
-            const remainder = mapL.id.replace("custom-layer-outline-", "").replace("custom-layer-", "");
+            const remainder = mapL.id
+              .replace("custom-layer-outline-", "")
+              .replace("custom-layer-", "");
             const layerStillExists = layers.some((l) => l.id === remainder);
             if (!layerStillExists) {
               if (map.getLayer(mapL.id)) {
@@ -841,8 +937,10 @@ export default function MapContainer({
         // 3. Standard system layers cleanup if removed from prop list
         const hasKabupaten = layers.some((l) => l.id === LayerId.KABUPATEN);
         if (!hasKabupaten) {
-          if (map.getLayer("kabupaten-layer")) map.removeLayer("kabupaten-layer");
-          if (map.getLayer("kabupaten-outline")) map.removeLayer("kabupaten-outline");
+          if (map.getLayer("kabupaten-layer"))
+            map.removeLayer("kabupaten-layer");
+          if (map.getLayer("kabupaten-outline"))
+            map.removeLayer("kabupaten-outline");
         }
 
         const hasJalan = layers.some((l) => l.id === LayerId.JALAN);
@@ -872,15 +970,31 @@ export default function MapContainer({
       // Kabupaten
       if (layer.id === LayerId.KABUPATEN) {
         if (map.getLayer("kabupaten-layer")) {
-          map.setLayoutProperty("kabupaten-layer", "visibility", visibilityValue);
+          map.setLayoutProperty(
+            "kabupaten-layer",
+            "visibility",
+            visibilityValue,
+          );
           map.setPaintProperty("kabupaten-layer", "fill-color", layer.color);
-          map.setPaintProperty("kabupaten-layer", "fill-opacity", layer.opacity);
+          map.setPaintProperty(
+            "kabupaten-layer",
+            "fill-opacity",
+            layer.opacity,
+          );
         }
         if (map.getLayer("kabupaten-outline")) {
-          map.setLayoutProperty("kabupaten-outline", "visibility", visibilityValue);
+          map.setLayoutProperty(
+            "kabupaten-outline",
+            "visibility",
+            visibilityValue,
+          );
           map.setPaintProperty("kabupaten-outline", "line-color", layer.color);
-          map.setPaintProperty("kabupaten-outline", "line-opacity", layer.opacity);
-          
+          map.setPaintProperty(
+            "kabupaten-outline",
+            "line-opacity",
+            layer.opacity,
+          );
+
           if (layer.lineStyle === "dashed") {
             map.setPaintProperty("kabupaten-outline", "line-dasharray", [3, 2]);
           } else if (layer.lineStyle === "dotted") {
@@ -890,7 +1004,9 @@ export default function MapContainer({
           }
         }
         if (layer.geojson && map.getSource("kabupaten-source")) {
-          const src = map.getSource("kabupaten-source") as maplibregl.GeoJSONSource;
+          const src = map.getSource(
+            "kabupaten-source",
+          ) as maplibregl.GeoJSONSource;
           src.setData(layer.geojson);
         }
       }
@@ -901,8 +1017,12 @@ export default function MapContainer({
           map.setLayoutProperty("jalan-layer", "visibility", visibilityValue);
           map.setPaintProperty("jalan-layer", "line-color", layer.color);
           map.setPaintProperty("jalan-layer", "line-opacity", layer.opacity);
-          map.setPaintProperty("jalan-layer", "line-width", layer.lineWidth || 3);
-          
+          map.setPaintProperty(
+            "jalan-layer",
+            "line-width",
+            layer.lineWidth || 3,
+          );
+
           if (layer.lineStyle === "dashed") {
             map.setPaintProperty("jalan-layer", "line-dasharray", [4, 3]);
           } else if (layer.lineStyle === "dotted") {
@@ -923,8 +1043,12 @@ export default function MapContainer({
           map.setLayoutProperty("sungai-layer", "visibility", visibilityValue);
           map.setPaintProperty("sungai-layer", "line-color", layer.color);
           map.setPaintProperty("sungai-layer", "line-opacity", layer.opacity);
-          map.setPaintProperty("sungai-layer", "line-width", layer.lineWidth || 4.5);
-          
+          map.setPaintProperty(
+            "sungai-layer",
+            "line-width",
+            layer.lineWidth || 4.5,
+          );
+
           if (layer.lineStyle === "dashed") {
             map.setPaintProperty("sungai-layer", "line-dasharray", [4, 3]);
           } else if (layer.lineStyle === "dotted") {
@@ -934,7 +1058,9 @@ export default function MapContainer({
           }
         }
         if (layer.geojson && map.getSource("sungai-source")) {
-          const src = map.getSource("sungai-source") as maplibregl.GeoJSONSource;
+          const src = map.getSource(
+            "sungai-source",
+          ) as maplibregl.GeoJSONSource;
           src.setData(layer.geojson);
         }
       }
@@ -962,7 +1088,7 @@ export default function MapContainer({
         if (layer.geojson && !map.getSource(sourceId)) {
           map.addSource(sourceId, {
             type: "geojson",
-            data: layer.geojson
+            data: layer.geojson,
           });
 
           if (layer.type === "fill") {
@@ -972,8 +1098,8 @@ export default function MapContainer({
               source: sourceId,
               paint: {
                 "fill-color": layer.color,
-                "fill-opacity": layer.opacity
-              }
+                "fill-opacity": layer.opacity,
+              },
             });
             map.addLayer({
               id: outlineLayerId,
@@ -981,9 +1107,10 @@ export default function MapContainer({
               source: sourceId,
               paint: {
                 "line-color": layer.color,
-                "line-opacity": layer.opacity + 0.2 > 1 ? 1 : layer.opacity + 0.2,
-                "line-width": 1.5
-              }
+                "line-opacity":
+                  layer.opacity + 0.2 > 1 ? 1 : layer.opacity + 0.2,
+                "line-width": 1.5,
+              },
             });
           } else if (layer.type === "line") {
             map.addLayer({
@@ -993,8 +1120,8 @@ export default function MapContainer({
               paint: {
                 "line-color": layer.color,
                 "line-opacity": layer.opacity,
-                "line-width": layer.lineWidth || 3
-              }
+                "line-width": layer.lineWidth || 3,
+              },
             });
           } else {
             // Circle/Point layer
@@ -1007,14 +1134,16 @@ export default function MapContainer({
                 "circle-opacity": layer.opacity,
                 "circle-radius": 6,
                 "circle-stroke-color": "#ffffff",
-                "circle-stroke-width": 1
-              }
+                "circle-stroke-width": 1,
+              },
             });
           }
 
           // Feature click listener for attributes table popup support on click
           map.on("click", mainLayerId, (e) => {
-            const features = map.queryRenderedFeatures(e.point, { layers: [mainLayerId] });
+            const features = map.queryRenderedFeatures(e.point, {
+              layers: [mainLayerId],
+            });
             if (features.length > 0) {
               const feat = features[0];
               const targetLayer = layers.find((l) => l.id === layer.id);
@@ -1023,9 +1152,13 @@ export default function MapContainer({
                 fIndex = targetLayer.geojson.features.findIndex((f: any) => {
                   if (f.properties && feat.properties) {
                     const fName = f.properties.nama || f.properties.name;
-                    const featName = feat.properties.nama || feat.properties.name;
+                    const featName =
+                      feat.properties.nama || feat.properties.name;
                     if (fName && featName) return fName === featName;
-                    return JSON.stringify(f.properties) === JSON.stringify(feat.properties);
+                    return (
+                      JSON.stringify(f.properties) ===
+                      JSON.stringify(feat.properties)
+                    );
                   }
                   return false;
                 });
@@ -1037,7 +1170,7 @@ export default function MapContainer({
                 properties: feat.properties || {},
                 coordinates: e.lngLat.toArray() as [number, number],
                 geometry: feat.geometry,
-                featureIndex: fIndex >= 0 ? fIndex : undefined
+                featureIndex: fIndex >= 0 ? fIndex : undefined,
               } as any);
             }
           });
@@ -1053,7 +1186,9 @@ export default function MapContainer({
 
         // Sync dynamic GeoJSON source data with main layer state edits or newly drawn shapes
         if (layer.geojson && map.getSource(sourceId)) {
-          const existingSource = map.getSource(sourceId) as maplibregl.GeoJSONSource;
+          const existingSource = map.getSource(
+            sourceId,
+          ) as maplibregl.GeoJSONSource;
           if (existingSource) {
             existingSource.setData(layer.geojson);
           }
@@ -1066,15 +1201,27 @@ export default function MapContainer({
             map.setPaintProperty(mainLayerId, "fill-color", layer.color);
             map.setPaintProperty(mainLayerId, "fill-opacity", layer.opacity);
             if (map.getLayer(outlineLayerId)) {
-              map.setLayoutProperty(outlineLayerId, "visibility", visibilityValue);
+              map.setLayoutProperty(
+                outlineLayerId,
+                "visibility",
+                visibilityValue,
+              );
               map.setPaintProperty(outlineLayerId, "line-color", layer.color);
-              map.setPaintProperty(outlineLayerId, "line-opacity", layer.opacity + 0.2 > 1 ? 1 : layer.opacity + 0.2);
+              map.setPaintProperty(
+                outlineLayerId,
+                "line-opacity",
+                layer.opacity + 0.2 > 1 ? 1 : layer.opacity + 0.2,
+              );
             }
           } else if (layer.type === "line") {
             map.setPaintProperty(mainLayerId, "line-color", layer.color);
             map.setPaintProperty(mainLayerId, "line-opacity", layer.opacity);
-            map.setPaintProperty(mainLayerId, "line-width", layer.lineWidth || 3);
-            
+            map.setPaintProperty(
+              mainLayerId,
+              "line-width",
+              layer.lineWidth || 3,
+            );
+
             if (layer.lineStyle === "dashed") {
               map.setPaintProperty(mainLayerId, "line-dasharray", [4, 3]);
             } else if (layer.lineStyle === "dotted") {
@@ -1102,7 +1249,7 @@ export default function MapContainer({
           map.addSource(sourceId, {
             type: "raster",
             tiles: [wmsTileUrl],
-            tileSize: 256
+            tileSize: 256,
           });
 
           map.addLayer({
@@ -1110,8 +1257,8 @@ export default function MapContainer({
             type: "raster",
             source: sourceId,
             paint: {
-              "raster-opacity": layer.opacity
-            }
+              "raster-opacity": layer.opacity,
+            },
           });
         }
 
@@ -1139,40 +1286,47 @@ export default function MapContainer({
     const layerOpacity = landmarkLayer?.opacity ?? 1.0;
     const iconStyle = landmarkLayer?.iconStyle || "marker";
 
-    const featuresSource = landmarkLayer?.geojson?.features || LANDMARK_DATA.features;
+    const featuresSource =
+      landmarkLayer?.geojson?.features || LANDMARK_DATA.features;
 
-    featuresSource.forEach((feature, idx) => {
+    featuresSource.forEach((feature: any, idx: number) => {
       const coords = feature.geometry.coordinates as [number, number];
       const props = feature.properties || {};
 
       // Create Custom Marker HTML
       const el = document.createElement("div");
-      
+
       let shapeClasses = "";
       let innerHTML = "";
 
       if (iconStyle === "circle") {
-        shapeClasses = "w-7 h-7 rounded-full flex items-center justify-center border-2 border-white shadow-lg cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
+        shapeClasses =
+          "w-7 h-7 rounded-full flex items-center justify-center border-2 border-white shadow-lg cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
         innerHTML = `<div class="w-2.5 h-2.5 bg-white rounded-full"></div>`;
       } else if (iconStyle === "square") {
-        shapeClasses = "w-7 h-7 rounded-lg flex items-center justify-center border-2 border-white shadow-lg cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
+        shapeClasses =
+          "w-7 h-7 rounded-lg flex items-center justify-center border-2 border-white shadow-lg cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
         innerHTML = `<div class="w-2.5 h-2.5 bg-white rounded-sm"></div>`;
       } else if (iconStyle === "star") {
-        shapeClasses = "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
+        shapeClasses =
+          "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
         innerHTML = `
           <svg class="w-8 h-8 filter drop-shadow-md" viewBox="0 0 24 24" fill="${layerColor}">
             <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" stroke="white" stroke-width="1.5"/>
           </svg>
         `;
       } else if (iconStyle === "triangle") {
-        shapeClasses = "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
+        shapeClasses =
+          "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
         innerHTML = `
           <svg class="w-8 h-8 filter drop-shadow-md" viewBox="0 0 24 24" fill="${layerColor}">
             <polygon points="12,2 22,22 2,22" stroke="white" stroke-width="2"/>
           </svg>
         `;
-      } else { // "marker"
-        shapeClasses = "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
+      } else {
+        // "marker"
+        shapeClasses =
+          "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
         innerHTML = `
           <svg class="w-8 h-8 filter drop-shadow-md" viewBox="0 0 24 24" fill="${layerColor}">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" stroke="white" stroke-width="1.5"/>
@@ -1190,7 +1344,8 @@ export default function MapContainer({
 
       // Tooltip/label on hover
       const label = document.createElement("div");
-      label.className = "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-slate-950 text-white font-sans text-[10px] py-1 px-2 rounded shadow-md border border-slate-800 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-semibold";
+      label.className =
+        "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-slate-950 text-white font-sans text-[10px] py-1 px-2 rounded shadow-md border border-slate-800 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-semibold";
       label.textContent = props.name || props.nama || "Landmark";
       el.appendChild(label);
 
@@ -1203,7 +1358,7 @@ export default function MapContainer({
           properties: props,
           coordinates: coords,
           geometry: feature.geometry,
-          featureIndex: idx
+          featureIndex: idx,
         } as any);
         map.flyTo({ center: coords, zoom: 15, duration: 1000 });
       });
@@ -1226,7 +1381,8 @@ export default function MapContainer({
 
     customPins.forEach((pin) => {
       const el = document.createElement("div");
-      el.className = "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform relative group";
+      el.className =
+        "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform relative group";
 
       // Marker Icon (Red pin teardrop styled)
       el.innerHTML = `
@@ -1237,7 +1393,8 @@ export default function MapContainer({
 
       // Hover Tooltip
       const label = document.createElement("div");
-      label.className = "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1.5 bg-slate-950 text-red-400 font-sans text-[10px] font-bold py-1 px-2 rounded border border-red-900/40 shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50";
+      label.className =
+        "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1.5 bg-slate-950 text-red-400 font-sans text-[10px] font-bold py-1 px-2 rounded border border-red-900/40 shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50";
       label.textContent = pin.name;
       el.appendChild(label);
 
@@ -1250,9 +1407,9 @@ export default function MapContainer({
             kategori: pin.category,
             deskripsi: pin.description,
             latitude: pin.coordinates[1],
-            longitude: pin.coordinates[0]
+            longitude: pin.coordinates[0],
           },
-          coordinates: pin.coordinates
+          coordinates: pin.coordinates,
         });
         map.flyTo({ center: pin.coordinates, zoom: 15, duration: 1000 });
       });
@@ -1291,7 +1448,7 @@ export default function MapContainer({
     if (!map.getSource(sourceId)) {
       map.addSource(sourceId, {
         type: "geojson",
-        data: latestGeoJSON
+        data: latestGeoJSON,
       });
 
       // Render as both transparent fill and outline
@@ -1301,8 +1458,8 @@ export default function MapContainer({
         source: sourceId,
         paint: {
           "fill-color": "#10b981",
-          "fill-opacity": 0.25
-        }
+          "fill-opacity": 0.25,
+        },
       });
 
       map.addLayer({
@@ -1311,8 +1468,8 @@ export default function MapContainer({
         source: sourceId,
         paint: {
           "line-color": "#047857",
-          "line-width": 2
-        }
+          "line-width": 2,
+        },
       });
 
       // Fly to bounds or first coordinate
@@ -1322,8 +1479,10 @@ export default function MapContainer({
           const geom = firstFeature.geometry;
           let targetCoords: [number, number] | null = null;
           if (geom.type === "Point") targetCoords = geom.coordinates;
-          else if (geom.type === "Polygon") targetCoords = geom.coordinates[0][0];
-          else if (geom.type === "LineString") targetCoords = geom.coordinates[0];
+          else if (geom.type === "Polygon")
+            targetCoords = geom.coordinates[0][0];
+          else if (geom.type === "LineString")
+            targetCoords = geom.coordinates[0];
 
           if (targetCoords) {
             map.flyTo({ center: targetCoords, zoom: 12.5 });
@@ -1366,7 +1525,7 @@ export default function MapContainer({
     if (!map.getSource("kabupaten-source")) {
       map.addSource("kabupaten-source", {
         type: "geojson",
-        data: KABUPATEN_DATA
+        data: KABUPATEN_DATA,
       });
 
       map.addLayer({
@@ -1375,8 +1534,8 @@ export default function MapContainer({
         source: "kabupaten-source",
         paint: {
           "fill-color": ["get", "color"],
-          "fill-opacity": 0.22
-        }
+          "fill-opacity": 0.22,
+        },
       });
 
       map.addLayer({
@@ -1386,8 +1545,8 @@ export default function MapContainer({
         paint: {
           "line-color": ["get", "color"],
           "line-width": 1.5,
-          "line-dasharray": [3, 2]
-        }
+          "line-dasharray": [3, 2],
+        },
       });
     }
 
@@ -1395,7 +1554,7 @@ export default function MapContainer({
     if (!map.getSource("jalan-source")) {
       map.addSource("jalan-source", {
         type: "geojson",
-        data: JALAN_DATA
+        data: JALAN_DATA,
       });
 
       map.addLayer({
@@ -1405,8 +1564,8 @@ export default function MapContainer({
         paint: {
           "line-color": "#f59e0b",
           "line-width": 3,
-          "line-opacity": 0.95
-        }
+          "line-opacity": 0.95,
+        },
       });
     }
 
@@ -1414,7 +1573,7 @@ export default function MapContainer({
     if (!map.getSource("sungai-source")) {
       map.addSource("sungai-source", {
         type: "geojson",
-        data: SUNGAI_DATA
+        data: SUNGAI_DATA,
       });
 
       map.addLayer({
@@ -1424,8 +1583,8 @@ export default function MapContainer({
         paint: {
           "line-color": "#06b6d4",
           "line-width": 4.5,
-          "line-opacity": 0.8
-        }
+          "line-opacity": 0.8,
+        },
       });
     }
 
@@ -1435,8 +1594,8 @@ export default function MapContainer({
         type: "geojson",
         data: {
           type: "FeatureCollection",
-          features: []
-        }
+          features: [],
+        },
       });
 
       map.addLayer({
@@ -1446,8 +1605,8 @@ export default function MapContainer({
         paint: {
           "line-color": "#ef4444",
           "line-width": 3,
-          "line-dasharray": [1, 1]
-        }
+          "line-dasharray": [1, 1],
+        },
       });
 
       map.addLayer({
@@ -1458,8 +1617,8 @@ export default function MapContainer({
           "circle-radius": 5,
           "circle-color": "#ef4444",
           "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff"
-        }
+          "circle-stroke-color": "#ffffff",
+        },
       });
     }
 
@@ -1469,8 +1628,8 @@ export default function MapContainer({
         type: "geojson",
         data: {
           type: "FeatureCollection",
-          features: []
-        }
+          features: [],
+        },
       });
 
       map.addLayer({
@@ -1479,8 +1638,8 @@ export default function MapContainer({
         source: "buffer-source",
         paint: {
           "fill-color": "#10b981",
-          "fill-opacity": 0.25
-        }
+          "fill-opacity": 0.25,
+        },
       });
 
       map.addLayer({
@@ -1489,8 +1648,8 @@ export default function MapContainer({
         source: "buffer-source",
         paint: {
           "line-color": "#047857",
-          "line-width": 2
-        }
+          "line-width": 2,
+        },
       });
     }
 
@@ -1500,8 +1659,8 @@ export default function MapContainer({
         type: "geojson",
         data: {
           type: "FeatureCollection",
-          features: []
-        }
+          features: [],
+        },
       });
 
       // Fill layer (for polygons)
@@ -1511,9 +1670,9 @@ export default function MapContainer({
         source: "draw-temp-source",
         paint: {
           "fill-color": "#e11d48",
-          "fill-opacity": 0.3
+          "fill-opacity": 0.3,
         },
-        filter: ["==", "$type", "Polygon"]
+        filter: ["==", "$type", "Polygon"],
       });
 
       // Line layer (for line strings and polygon boundaries)
@@ -1524,9 +1683,9 @@ export default function MapContainer({
         paint: {
           "line-color": "#e11d48",
           "line-width": 3,
-          "line-dasharray": [2, 1]
+          "line-dasharray": [2, 1],
         },
-        filter: ["in", "$type", "LineString", "Polygon"]
+        filter: ["in", "$type", "LineString", "Polygon"],
       });
 
       // Circle layer (for points and nodes)
@@ -1538,8 +1697,8 @@ export default function MapContainer({
           "circle-radius": 6,
           "circle-color": "#e11d48",
           "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff"
-        }
+          "circle-stroke-color": "#ffffff",
+        },
       });
     }
 
@@ -1549,8 +1708,8 @@ export default function MapContainer({
         type: "geojson",
         data: {
           type: "FeatureCollection",
-          features: []
-        }
+          features: [],
+        },
       });
 
       // Fill Layer (Polygons)
@@ -1560,9 +1719,9 @@ export default function MapContainer({
         source: "editing-highlight-source",
         paint: {
           "fill-color": "#f97316",
-          "fill-opacity": 0.4
+          "fill-opacity": 0.4,
         },
-        filter: ["==", "$type", "Polygon"]
+        filter: ["==", "$type", "Polygon"],
       });
 
       // Line Layer (Lines & Polygon borders)
@@ -1573,9 +1732,9 @@ export default function MapContainer({
         paint: {
           "line-color": "#f97316",
           "line-width": 4,
-          "line-dasharray": [1.5, 1]
+          "line-dasharray": [1.5, 1],
         },
-        filter: ["in", "$type", "LineString", "Polygon"]
+        filter: ["in", "$type", "LineString", "Polygon"],
       });
 
       // Point Layer (Circles)
@@ -1587,9 +1746,9 @@ export default function MapContainer({
           "circle-radius": 7,
           "circle-color": "#f97316",
           "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff"
+          "circle-stroke-color": "#ffffff",
         },
-        filter: ["==", "$type", "Point"]
+        filter: ["==", "$type", "Point"],
       });
     }
 
@@ -1606,7 +1765,7 @@ export default function MapContainer({
       "measure-line-layer",
       "measure-points-layer",
       "buffer-fill-layer",
-      "buffer-outline-layer"
+      "buffer-outline-layer",
     ];
 
     activeVectorLayers.forEach((layerId) => {
@@ -1635,7 +1794,7 @@ export default function MapContainer({
       activeTool: curActiveTool,
       bufferRadius: curBufferRadius,
       onFeatureClick: curOnFeatureClick,
-      editingFeature: curEditingFeature
+      editingFeature: curEditingFeature,
     } = stateRef.current;
 
     // Vertex editing intercept
@@ -1647,7 +1806,7 @@ export default function MapContainer({
     if (curDrawingLayerId) {
       const targetLayer = curLayers.find((l) => l.id === curDrawingLayerId);
       const layerType = targetLayer?.type || "circle";
-      
+
       setDrawPoints((prev) => {
         let updated = [...prev];
         if (layerType === "circle") {
@@ -1685,7 +1844,7 @@ export default function MapContainer({
 
     // D. Default mode: Query vector layers at pixel
     const features = map.queryRenderedFeatures(e.point, {
-      layers: ["kabupaten-layer", "jalan-layer", "sungai-layer"]
+      layers: ["kabupaten-layer", "jalan-layer", "sungai-layer"],
     });
 
     if (features.length > 0) {
@@ -1713,7 +1872,10 @@ export default function MapContainer({
             const fName = f.properties.name || f.properties.nama;
             const featName = feature.properties.name || feature.properties.nama;
             if (fName && featName) return fName === featName;
-            return JSON.stringify(f.properties) === JSON.stringify(feature.properties);
+            return (
+              JSON.stringify(f.properties) ===
+              JSON.stringify(feature.properties)
+            );
           }
           return false;
         });
@@ -1725,7 +1887,7 @@ export default function MapContainer({
         properties: feature.properties || {},
         coordinates: clickedCoords,
         geometry: feature.geometry,
-        featureIndex: fIndex >= 0 ? fIndex : undefined
+        featureIndex: fIndex >= 0 ? fIndex : undefined,
       } as any);
     } else {
       curOnFeatureClick(null);
@@ -1733,7 +1895,8 @@ export default function MapContainer({
   };
 
   const handleMapContextMenu = (e: maplibregl.MapMouseEvent) => {
-    const { editingFeature: curEditingFeature, layers: curLayers } = stateRef.current;
+    const { editingFeature: curEditingFeature, layers: curLayers } =
+      stateRef.current;
     if (!curEditingFeature) return;
 
     e.originalEvent.preventDefault();
@@ -1774,7 +1937,9 @@ export default function MapContainer({
 
       const map = mapRef.current;
       if (map) {
-        const targetLayer = curLayers.find((l) => l.id === curEditingFeature.layerId);
+        const targetLayer = curLayers.find(
+          (l) => l.id === curEditingFeature.layerId,
+        );
         const layerType = targetLayer?.type || "circle";
         recreateEditingMarkers(map, updated, layerType, geom.type);
       }
@@ -1790,7 +1955,9 @@ export default function MapContainer({
     const map = mapRef.current;
     if (!map) return;
 
-    const source = map.getSource("measure-line-source") as maplibregl.GeoJSONSource;
+    const source = map.getSource(
+      "measure-line-source",
+    ) as maplibregl.GeoJSONSource;
     if (!source) return;
 
     const features: any[] = [];
@@ -1802,8 +1969,8 @@ export default function MapContainer({
         properties: { type: "measure-line" },
         geometry: {
           type: "LineString",
-          coordinates: pts
-        }
+          coordinates: pts,
+        },
       });
     }
 
@@ -1814,23 +1981,29 @@ export default function MapContainer({
         properties: { type: "measure-node" },
         geometry: {
           type: "Point",
-          coordinates: pt
-        }
+          coordinates: pt,
+        },
       });
     });
 
     source.setData({
       type: "FeatureCollection",
-      features: features
+      features: features,
     });
   };
 
   // Update dynamic feature drawing visual representation (includes completed session features + currently active path)
-  const syncDrawTempSource = (pts: [number, number][], type: string, completed: any[]) => {
+  const syncDrawTempSource = (
+    pts: [number, number][],
+    type: string,
+    completed: any[],
+  ) => {
     const map = mapRef.current;
     if (!map) return;
 
-    const source = map.getSource("draw-temp-source") as maplibregl.GeoJSONSource;
+    const source = map.getSource(
+      "draw-temp-source",
+    ) as maplibregl.GeoJSONSource;
     if (!source) return;
 
     const features: any[] = [];
@@ -1840,7 +2013,7 @@ export default function MapContainer({
       features.push({
         type: "Feature",
         properties: f.properties || {},
-        geometry: f.geometry
+        geometry: f.geometry,
       });
     });
 
@@ -1851,8 +2024,8 @@ export default function MapContainer({
         properties: { isTemp: true },
         geometry: {
           type: "Polygon",
-          coordinates: [[...pts, pts[0]]]
-        }
+          coordinates: [[...pts, pts[0]]],
+        },
       });
     }
 
@@ -1862,8 +2035,8 @@ export default function MapContainer({
         properties: { isTemp: true },
         geometry: {
           type: "LineString",
-          coordinates: pts
-        }
+          coordinates: pts,
+        },
       });
     }
 
@@ -1875,8 +2048,8 @@ export default function MapContainer({
           properties: { isTemp: true },
           geometry: {
             type: "Point",
-            coordinates: pt
-          }
+            coordinates: pt,
+          },
         });
       });
     } else {
@@ -1887,15 +2060,15 @@ export default function MapContainer({
           properties: { isTempVertex: true },
           geometry: {
             type: "Point",
-            coordinates: pt
-          }
+            coordinates: pt,
+          },
         });
       });
     }
 
     source.setData({
       type: "FeatureCollection",
-      features: features
+      features: features,
     });
   };
 
@@ -1915,7 +2088,9 @@ export default function MapContainer({
     setDrawDragOffset({ x: 0, y: 0 });
     const map = mapRef.current;
     if (map) {
-      const source = map.getSource("draw-temp-source") as maplibregl.GeoJSONSource;
+      const source = map.getSource(
+        "draw-temp-source",
+      ) as maplibregl.GeoJSONSource;
       if (source) {
         source.setData({ type: "FeatureCollection", features: [] });
       }
@@ -1933,7 +2108,7 @@ export default function MapContainer({
     const bufferGeoJSON = generateCircularBufferGeoJSON(center, rKm);
     source.setData({
       type: "FeatureCollection",
-      features: [bufferGeoJSON]
+      features: [bufferGeoJSON],
     });
   };
 
@@ -1950,7 +2125,10 @@ export default function MapContainer({
     if (measurePoints.length < 2) return 0;
     let total = 0;
     for (let i = 0; i < measurePoints.length - 1; i++) {
-      total += calculateHaversineDistance(measurePoints[i], measurePoints[i + 1]);
+      total += calculateHaversineDistance(
+        measurePoints[i],
+        measurePoints[i + 1],
+      );
     }
     return total;
   };
@@ -1963,7 +2141,9 @@ export default function MapContainer({
 
     const map = mapRef.current;
     if (map) {
-      const bufSource = map.getSource("buffer-source") as maplibregl.GeoJSONSource;
+      const bufSource = map.getSource(
+        "buffer-source",
+      ) as maplibregl.GeoJSONSource;
       if (bufSource) {
         bufSource.setData({ type: "FeatureCollection", features: [] });
       }
@@ -1986,7 +2166,7 @@ export default function MapContainer({
       name: newPinName,
       category: newPinCategory,
       coordinates: pinDialogCoords,
-      description: newPinDesc || "Tidak ada deskripsi tambahan"
+      description: newPinDesc || "Tidak ada deskripsi tambahan",
     });
 
     // Reset fields & close dialog
@@ -2037,7 +2217,15 @@ export default function MapContainer({
           const gl = canvas.getContext("webgl") || canvas.getContext("webgl2");
           if (gl) {
             const pixel = new Uint8Array(4);
-            (gl as WebGLRenderingContext).readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+            (gl as WebGLRenderingContext).readPixels(
+              0,
+              0,
+              1,
+              1,
+              gl.RGBA,
+              gl.UNSIGNED_BYTE,
+              pixel,
+            );
           }
 
           const dataUrl = canvas.toDataURL("image/png");
@@ -2102,7 +2290,10 @@ export default function MapContainer({
         let rulesHtml = "";
         for (const rule of Array.from(styleSheet.cssRules)) {
           // Skip @media print rules as they can conflict with our iframe print setup
-          if (rule.type === CSSRule.MEDIA_RULE && (rule as CSSMediaRule).media?.mediaText?.includes("print")) {
+          if (
+            rule.type === CSSRule.MEDIA_RULE &&
+            (rule as CSSMediaRule).media?.mediaText?.includes("print")
+          ) {
             continue;
           }
           rulesHtml += rule.cssText;
@@ -2124,12 +2315,22 @@ export default function MapContainer({
     });
 
     const isPortrait = printOrientation === "portrait";
-    const widthMm = printPaperSize === "A4" 
-      ? (isPortrait ? "210mm" : "297mm") 
-      : (isPortrait ? "297mm" : "420mm");
-    const heightMm = printPaperSize === "A4" 
-      ? (isPortrait ? "297mm" : "210mm") 
-      : (isPortrait ? "420mm" : "594mm");
+    const widthMm =
+      printPaperSize === "A4"
+        ? isPortrait
+          ? "210mm"
+          : "297mm"
+        : isPortrait
+          ? "297mm"
+          : "420mm";
+    const heightMm =
+      printPaperSize === "A4"
+        ? isPortrait
+          ? "297mm"
+          : "210mm"
+        : isPortrait
+          ? "420mm"
+          : "594mm";
 
     // Write html inside iframe
     doc.open();
@@ -2222,12 +2423,22 @@ export default function MapContainer({
   };
 
   const isPortrait = printOrientation === "portrait";
-  const paperWidth = printPaperSize === "A4" 
-    ? (isPortrait ? "210mm" : "297mm") 
-    : (isPortrait ? "297mm" : "420mm");
-  const paperHeight = printPaperSize === "A4" 
-    ? (isPortrait ? "297mm" : "210mm") 
-    : (isPortrait ? "420mm" : "594mm");
+  const paperWidth =
+    printPaperSize === "A4"
+      ? isPortrait
+        ? "210mm"
+        : "297mm"
+      : isPortrait
+        ? "297mm"
+        : "420mm";
+  const paperHeight =
+    printPaperSize === "A4"
+      ? isPortrait
+        ? "297mm"
+        : "210mm"
+      : isPortrait
+        ? "420mm"
+        : "594mm";
 
   // Handle logo upload
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2265,7 +2476,11 @@ export default function MapContainer({
   return (
     <div className="flex-1 h-full relative bg-[#0f172a] flex flex-col overflow-hidden">
       {/* 1. Main Map Canvas Container */}
-      <div id="main-map" ref={mapContainerRef} className="w-full h-full flex-1 relative z-0" />
+      <div
+        id="main-map"
+        ref={mapContainerRef}
+        className="w-full h-full flex-1 relative z-0"
+      />
 
       {/* 2. Synchronized Mini Map Container (Requirements Spec: Mini Map) */}
       <div
@@ -2308,8 +2523,12 @@ export default function MapContainer({
           }`}
           title="Ganti Sudut Pandang 3D"
         >
-          <Navigation className={`w-4 h-4 transition-transform duration-500 ${is3DMode ? "rotate-45" : ""}`} />
-          <span className="font-bold text-[11px]">{is3DMode ? "2D" : "3D VIEW"}</span>
+          <Navigation
+            className={`w-4 h-4 transition-transform duration-500 ${is3DMode ? "rotate-45" : ""}`}
+          />
+          <span className="font-bold text-[11px]">
+            {is3DMode ? "2D" : "3D VIEW"}
+          </span>
         </button>
 
         {/* Zoom Controls */}
@@ -2340,24 +2559,34 @@ export default function MapContainer({
             </div>
             <div>
               <h3 className="font-bold text-xs">Ukur Jarak Spasial</h3>
-              <p className="text-[10px] text-slate-400 font-mono">Haversine formula</p>
+              <p className="text-[10px] text-slate-400 font-mono">
+                Haversine formula
+              </p>
             </div>
           </div>
 
           <div className="space-y-2.5 text-xs">
             <p className="text-[11px] text-slate-300 bg-[#1e293b]/80 p-2 rounded border border-[#334155]">
-              💡 <span className="font-semibold text-slate-200">Petunjuk:</span> Klik berurutan pada peta untuk menarik garis ukur.
+              💡 <span className="font-semibold text-slate-200">Petunjuk:</span>{" "}
+              Klik berurutan pada peta untuk menarik garis ukur.
             </p>
 
             <div className="p-2 bg-[#1e293b]/50 rounded border border-[#334155]">
-              <span className="text-[9px] text-slate-500 uppercase tracking-wider font-mono">Jumlah Titik</span>
-              <p className="font-bold text-[#38bdf8] mt-0.5 font-mono">{measurePoints.length} Titik Koordinat</p>
+              <span className="text-[9px] text-slate-500 uppercase tracking-wider font-mono">
+                Jumlah Titik
+              </span>
+              <p className="font-bold text-[#38bdf8] mt-0.5 font-mono">
+                {measurePoints.length} Titik Koordinat
+              </p>
             </div>
 
             <div className="p-2 bg-[#1e293b]/50 rounded border border-[#334155]">
-              <span className="text-[9px] text-slate-500 uppercase tracking-wider font-mono">Total Jarak Linier</span>
+              <span className="text-[9px] text-slate-500 uppercase tracking-wider font-mono">
+                Total Jarak Linier
+              </span>
               <p className="font-extrabold text-base text-amber-400 mt-0.5 font-mono">
-                {getMeasuredDistance().toFixed(3)} <span className="text-xs font-semibold text-slate-400">km</span>
+                {getMeasuredDistance().toFixed(3)}{" "}
+                <span className="text-xs font-semibold text-slate-400">km</span>
               </p>
               <p className="text-[9px] text-slate-500 font-mono">
                 ≈ {(getMeasuredDistance() * 1000).toFixed(0)} meter
@@ -2391,20 +2620,28 @@ export default function MapContainer({
               <Radio className="w-4 h-4 animate-ping" />
             </div>
             <div>
-              <h3 className="font-bold text-xs text-[#38bdf8]">Generator Buffer Spasial</h3>
-              <p className="text-[10px] text-slate-400 font-mono">Area circle overlay</p>
+              <h3 className="font-bold text-xs text-[#38bdf8]">
+                Generator Buffer Spasial
+              </h3>
+              <p className="text-[10px] text-slate-400 font-mono">
+                Area circle overlay
+              </p>
             </div>
           </div>
 
           <div className="space-y-3.5 text-xs">
             <p className="text-[11px] text-slate-300 bg-[#1e293b]/80 p-2 rounded border border-[#334155]">
-              📍 <span className="font-semibold text-slate-200">Petunjuk:</span> Klik di mana saja pada peta untuk menggambar area penyangga melingkar.
+              📍 <span className="font-semibold text-slate-200">Petunjuk:</span>{" "}
+              Klik di mana saja pada peta untuk menggambar area penyangga
+              melingkar.
             </p>
 
             {/* Slider control */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-[10px] font-mono">
-                <span className="text-slate-400 uppercase tracking-wider">Radius Buffer</span>
+                <span className="text-slate-400 uppercase tracking-wider">
+                  Radius Buffer
+                </span>
                 <span className="text-[#38bdf8] font-bold bg-[#1e293b] px-1.5 py-0.5 rounded border border-[#334155]">
                   {bufferRadius.toFixed(1)} km
                 </span>
@@ -2415,7 +2652,9 @@ export default function MapContainer({
                 max="5.0"
                 step="0.1"
                 value={bufferRadius}
-                onChange={(e) => handleBufferRadiusChange(parseFloat(e.target.value))}
+                onChange={(e) =>
+                  handleBufferRadiusChange(parseFloat(e.target.value))
+                }
                 className="w-full h-1 bg-[#1e293b] rounded-lg appearance-none cursor-pointer accent-[#38bdf8]"
               />
               <div className="flex justify-between text-[8px] text-slate-500 font-mono">
@@ -2427,9 +2666,12 @@ export default function MapContainer({
 
             {bufferCenter && (
               <div className="p-2 bg-[#1e293b]/50 rounded border border-[#334155] text-[10px] font-mono">
-                <span className="text-slate-500 uppercase tracking-wider">Titik Pusat Buffer</span>
+                <span className="text-slate-500 uppercase tracking-wider">
+                  Titik Pusat Buffer
+                </span>
                 <p className="text-[#38bdf8] mt-0.5 truncate font-semibold">
-                  Lon: {bufferCenter[0].toFixed(5)} | Lat: {bufferCenter[1].toFixed(5)}
+                  Lon: {bufferCenter[0].toFixed(5)} | Lat:{" "}
+                  {bufferCenter[1].toFixed(5)}
                 </p>
               </div>
             )}
@@ -2458,8 +2700,8 @@ export default function MapContainer({
           <div
             style={{
               transform: `translate(calc(-50% + ${pinDragOffset.x}px), ${pinDragOffset.y}px)`,
-              top: '100px',
-              left: '50%'
+              top: "100px",
+              left: "50%",
             }}
             className="pointer-events-auto absolute bg-[#0f172a]/95 border border-[#334155] rounded-xl shadow-2xl p-5 w-full max-w-sm text-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-150 select-none"
           >
@@ -2472,7 +2714,9 @@ export default function MapContainer({
                 <MapPin className="w-5 h-5 text-orange-500 animate-bounce" />
                 <h3 className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
                   Tambah Penanda Kustom
-                  <span className="text-[9px] text-[#38bdf8] font-normal normal-case animate-pulse font-mono">(Seret Panel ⬘)</span>
+                  <span className="text-[9px] text-[#38bdf8] font-normal normal-case animate-pulse font-mono">
+                    (Seret Panel ⬘)
+                  </span>
                 </h3>
               </div>
               <button
@@ -2529,9 +2773,15 @@ export default function MapContainer({
               </div>
 
               <div className="bg-[#1e293b] p-2.5 rounded border border-[#334155] font-mono text-[10px] text-slate-400">
-                <span className="uppercase font-bold block text-[8px] tracking-wider mb-1 text-slate-500">Koordinat Terpilih</span>
-                <p className="text-slate-300">Lon: {pinDialogCoords[0].toFixed(6)}</p>
-                <p className="text-slate-300">Lat: {pinDialogCoords[1].toFixed(6)}</p>
+                <span className="uppercase font-bold block text-[8px] tracking-wider mb-1 text-slate-500">
+                  Koordinat Terpilih
+                </span>
+                <p className="text-slate-300">
+                  Lon: {pinDialogCoords[0].toFixed(6)}
+                </p>
+                <p className="text-slate-300">
+                  Lat: {pinDialogCoords[1].toFixed(6)}
+                </p>
               </div>
             </div>
 
@@ -2555,396 +2805,475 @@ export default function MapContainer({
       )}
 
       {/* FLOATING FEATURE VERTEX EDITING OVERLAY */}
-      {editingFeature && (() => {
-        const targetLayer = layers.find((l) => l.id === editingFeature.layerId);
-        const geomType = editingFeature.geometry?.type || "Point";
+      {editingFeature &&
+        (() => {
+          const targetLayer = layers.find(
+            (l) => l.id === editingFeature.layerId,
+          );
+          const geomType = editingFeature.geometry?.type || "Point";
 
-        const handleAddVertexAtCenter = () => {
-          const map = mapRef.current;
-          if (!map) return;
-          const center = map.getCenter();
-          const newCoord: [number, number] = [center.lng, center.lat];
-          const updated = [...activeEditingCoords, newCoord];
-          setActiveEditingCoords(updated);
-          recreateEditingMarkers(map, updated, targetLayer?.type || "circle", geomType);
-        };
+          const handleAddVertexAtCenter = () => {
+            const map = mapRef.current;
+            if (!map) return;
+            const center = map.getCenter();
+            const newCoord: [number, number] = [center.lng, center.lat];
+            const updated = [...activeEditingCoords, newCoord];
+            setActiveEditingCoords(updated);
+            recreateEditingMarkers(
+              map,
+              updated,
+              targetLayer?.type || "circle",
+              geomType,
+            );
+          };
 
-        const handleDeleteVertex = (idxToDelete: number) => {
-          const map = mapRef.current;
-          if (!map) return;
-          const updated = activeEditingCoords.filter((_, idx) => idx !== idxToDelete);
-          setActiveEditingCoords(updated);
-          recreateEditingMarkers(map, updated, targetLayer?.type || "circle", geomType);
-        };
+          const handleDeleteVertex = (idxToDelete: number) => {
+            const map = mapRef.current;
+            if (!map) return;
+            const updated = activeEditingCoords.filter(
+              (_, idx) => idx !== idxToDelete,
+            );
+            setActiveEditingCoords(updated);
+            recreateEditingMarkers(
+              map,
+              updated,
+              targetLayer?.type || "circle",
+              geomType,
+            );
+          };
 
-        const handleSaveEdits = () => {
-          if (activeEditingCoords.length === 0) return;
+          const handleSaveEdits = () => {
+            if (activeEditingCoords.length === 0) return;
 
-          let finalGeom: any = null;
-          if (geomType === "Point") {
-            finalGeom = {
-              type: "Point",
-              coordinates: activeEditingCoords[0]
-            };
-          } else if (geomType === "LineString") {
-            finalGeom = {
-              type: "LineString",
-              coordinates: activeEditingCoords
-            };
-          } else if (geomType === "Polygon") {
-            finalGeom = {
-              type: "Polygon",
-              coordinates: [[...activeEditingCoords, activeEditingCoords[0]]]
-            };
-          }
+            let finalGeom: any = null;
+            if (geomType === "Point") {
+              finalGeom = {
+                type: "Point",
+                coordinates: activeEditingCoords[0],
+              };
+            } else if (geomType === "LineString") {
+              finalGeom = {
+                type: "LineString",
+                coordinates: activeEditingCoords,
+              };
+            } else if (geomType === "Polygon") {
+              finalGeom = {
+                type: "Polygon",
+                coordinates: [[...activeEditingCoords, activeEditingCoords[0]]],
+              };
+            }
 
-          if (onSaveEditedFeature) {
-            onSaveEditedFeature(editingFeature.layerId, editingFeature.featureIndex, finalGeom, editProperties);
-          }
-        };
+            if (onSaveEditedFeature) {
+              onSaveEditedFeature(
+                editingFeature.layerId,
+                editingFeature.featureIndex,
+                finalGeom,
+                editProperties,
+              );
+            }
+          };
 
-        return (
-          <div
-            style={{
-              transform: `translate(calc(-50% + ${editDragOffset.x}px), ${editDragOffset.y}px)`,
-              top: '16px',
-              left: '50%'
-            }}
-            className="absolute bg-[#0f172a]/95 border-2 border-orange-500 rounded-xl shadow-2xl p-4 z-40 w-full max-w-lg text-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs select-none"
-          >
+          return (
             <div
-              onMouseDown={handleEditDragMouseDown}
-              className="flex justify-between items-center border-b border-[#334155] pb-2 cursor-move select-none"
-              title="Seret header ini untuk memindahkan panel"
+              style={{
+                transform: `translate(calc(-50% + ${editDragOffset.x}px), ${editDragOffset.y}px)`,
+                top: "16px",
+                left: "50%",
+              }}
+              className="absolute bg-[#0f172a]/95 border-2 border-orange-500 rounded-xl shadow-2xl p-4 z-40 w-full max-w-lg text-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs select-none"
             >
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
-                <h4 className="font-bold text-xs text-slate-100 font-mono tracking-wide uppercase flex items-center gap-1.5">
-                  Edit Vertex & Atribut: {targetLayer?.name || "Layer Kustom"}
-                  <span className="text-[9px] text-orange-400 font-normal normal-case animate-pulse">(Seret Panel ⬘)</span>
-                </h4>
-              </div>
-              <div className="text-[10px] font-mono text-slate-400">
-                {activeEditingCoords.length} Vertex Aktif
-              </div>
-            </div>
-
-            <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
-              💡 <strong>Panduan:</strong> Geser penanda angka berwarna <strong>oranye</strong> di peta untuk memindahkan vertex secara interaktif. Anda juga dapat mengubah nilai atribut di bawah ini.
-            </p>
-
-            {/* Atribut Editor */}
-            <div className="grid grid-cols-2 gap-2 text-xs bg-[#1e293b]/40 p-2.5 rounded-lg border border-[#334155]/50 max-h-36 overflow-y-auto custom-scrollbar">
-              <div className="col-span-2 text-[10px] text-orange-400 font-bold uppercase font-mono tracking-wider mb-0.5">
-                Edit Atribut Fitur
-              </div>
-              {Object.keys(editProperties).map((key) => {
-                if (key === "color") return null;
-                return (
-                  <div key={key} className="flex flex-col gap-1">
-                    <label className="text-[9px] text-slate-400 font-bold uppercase font-mono">{key}</label>
-                    <input
-                      type="text"
-                      value={editProperties[key] || ""}
-                      onChange={(e) => setEditProperties({ ...editProperties, [key]: e.target.value })}
-                      className="bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 focus:outline-none focus:border-orange-500 transition-all font-mono text-[11px]"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Vertices List */}
-            {geomType !== "Point" && (
-              <div className="flex flex-col gap-1.5 bg-[#0f172a] p-2.5 rounded-lg border border-[#334155]">
-                <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase font-mono tracking-wider">
-                  <span>Daftar Koordinat Vertices ({activeEditingCoords.length})</span>
-                  <button
-                    type="button"
-                    onClick={handleAddVertexAtCenter}
-                    className="px-2 py-0.5 bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 border border-orange-500/30 rounded text-[9px] font-mono transition-all cursor-pointer"
-                  >
-                    + Tambah Vertex Baru
-                  </button>
+              <div
+                onMouseDown={handleEditDragMouseDown}
+                className="flex justify-between items-center border-b border-[#334155] pb-2 cursor-move select-none"
+                title="Seret header ini untuk memindahkan panel"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
+                  <h4 className="font-bold text-xs text-slate-100 font-mono tracking-wide uppercase flex items-center gap-1.5">
+                    Edit Vertex & Atribut: {targetLayer?.name || "Layer Kustom"}
+                    <span className="text-[9px] text-orange-400 font-normal normal-case animate-pulse">
+                      (Seret Panel ⬘)
+                    </span>
+                  </h4>
                 </div>
-                <div className="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1 custom-scrollbar">
-                  {activeEditingCoords.map((coord, idx) => (
-                    <div
-                      key={idx}
-                      className="flex justify-between items-center bg-[#1e293b]/70 px-2.5 py-1.5 rounded border border-[#334155]/60 text-[10px] font-mono"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 bg-orange-600/20 text-orange-400 rounded-full flex items-center justify-center font-bold text-[9px]">
-                          {idx + 1}
-                        </span>
-                        <span>Lon: {coord[0].toFixed(5)}</span>
-                        <span className="text-slate-500">|</span>
-                        <span>Lat: {coord[1].toFixed(5)}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteVertex(idx)}
-                        disabled={activeEditingCoords.length <= (geomType === "Polygon" ? 3 : 2)}
-                        className="text-red-400 hover:text-red-300 disabled:opacity-30 p-1 rounded transition-all cursor-pointer"
-                        title="Hapus vertex ini"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                <div className="text-[10px] font-mono text-slate-400">
+                  {activeEditingCoords.length} Vertex Aktif
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
+                💡 <strong>Panduan:</strong> Geser penanda angka berwarna{" "}
+                <strong>oranye</strong> di peta untuk memindahkan vertex secara
+                interaktif. Anda juga dapat mengubah nilai atribut di bawah ini.
+              </p>
+
+              {/* Atribut Editor */}
+              <div className="grid grid-cols-2 gap-2 text-xs bg-[#1e293b]/40 p-2.5 rounded-lg border border-[#334155]/50 max-h-36 overflow-y-auto custom-scrollbar">
+                <div className="col-span-2 text-[10px] text-orange-400 font-bold uppercase font-mono tracking-wider mb-0.5">
+                  Edit Atribut Fitur
+                </div>
+                {Object.keys(editProperties).map((key) => {
+                  if (key === "color") return null;
+                  return (
+                    <div key={key} className="flex flex-col gap-1">
+                      <label className="text-[9px] text-slate-400 font-bold uppercase font-mono">
+                        {key}
+                      </label>
+                      <input
+                        type="text"
+                        value={editProperties[key] || ""}
+                        onChange={(e) =>
+                          setEditProperties({
+                            ...editProperties,
+                            [key]: e.target.value,
+                          })
+                        }
+                        className="bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 focus:outline-none focus:border-orange-500 transition-all font-mono text-[11px]"
+                      />
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+
+              {/* Vertices List */}
+              {geomType !== "Point" && (
+                <div className="flex flex-col gap-1.5 bg-[#0f172a] p-2.5 rounded-lg border border-[#334155]">
+                  <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase font-mono tracking-wider">
+                    <span>
+                      Daftar Koordinat Vertices ({activeEditingCoords.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddVertexAtCenter}
+                      className="px-2 py-0.5 bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 border border-orange-500/30 rounded text-[9px] font-mono transition-all cursor-pointer"
+                    >
+                      + Tambah Vertex Baru
+                    </button>
+                  </div>
+                  <div className="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1 custom-scrollbar">
+                    {activeEditingCoords.map((coord, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center bg-[#1e293b]/70 px-2.5 py-1.5 rounded border border-[#334155]/60 text-[10px] font-mono"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-4 bg-orange-600/20 text-orange-400 rounded-full flex items-center justify-center font-bold text-[9px]">
+                            {idx + 1}
+                          </span>
+                          <span>Lon: {coord[0].toFixed(5)}</span>
+                          <span className="text-slate-500">|</span>
+                          <span>Lat: {coord[1].toFixed(5)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVertex(idx)}
+                          disabled={
+                            activeEditingCoords.length <=
+                            (geomType === "Polygon" ? 3 : 2)
+                          }
+                          className="text-red-400 hover:text-red-300 disabled:opacity-30 p-1 rounded transition-all cursor-pointer"
+                          title="Hapus vertex ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="flex gap-2 pt-1 border-t border-[#334155]/60">
-              <button
-                type="button"
-                onClick={onCancelEditing}
-                className="flex-1 py-1.5 bg-[#1e293b] hover:bg-slate-800 text-slate-300 font-bold font-mono rounded text-[10px] border border-[#334155] transition-all cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveEdits}
-                className="flex-1 py-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold font-mono rounded text-[10px] transition-all shadow-md cursor-pointer"
-              >
-                Simpan Perubahan
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* 5. FLOATING FEATURE DRAWING OVERLAY */}
-      {drawingLayerId && (() => {
-        const targetLayer = layers.find((l) => l.id === drawingLayerId);
-        const layerType = targetLayer?.type || "circle";
-        
-        // Validation for the current active geometry
-        const isValidActiveShape = 
-          (layerType === "circle" && drawPoints.length === 1) ||
-          (layerType === "line" && drawPoints.length >= 2) ||
-          (layerType === "fill" && drawPoints.length >= 3);
-
-        const handleAddActiveToList = () => {
-          if (!isValidActiveShape) return;
-          
-          let geom: any = null;
-          if (layerType === "circle") {
-            geom = {
-              type: "Point",
-              coordinates: drawPoints[0]
-            };
-          } else if (layerType === "line") {
-            geom = {
-              type: "LineString",
-              coordinates: drawPoints
-            };
-          } else if (layerType === "fill") {
-            geom = {
-              type: "Polygon",
-              coordinates: [[...drawPoints, drawPoints[0]]]
-            };
-          }
-
-          if (geom) {
-            setSessionFeatures((prev) => [
-              ...prev,
-              { geometry: geom, properties: { ...drawProperties } }
-            ]);
-            // Clear current drawing point & reset name
-            setDrawPoints([]);
-            setDrawProperties({
-              nama: `Objek Baru ${sessionFeatures.length + 2}`,
-              keterangan: "Dibuat secara interaktif"
-            });
-          }
-        };
-
-        const handleSaveAllAndClose = () => {
-          let finalFeatures = [...sessionFeatures];
-          
-          // Automatically append active shape if it is valid
-          if (isValidActiveShape) {
-            let geom: any = null;
-            if (layerType === "circle") {
-              geom = { type: "Point", coordinates: drawPoints[0] };
-            } else if (layerType === "line") {
-              geom = { type: "LineString", coordinates: drawPoints };
-            } else if (layerType === "fill") {
-              geom = { type: "Polygon", coordinates: [[...drawPoints, drawPoints[0]]] };
-            }
-            if (geom) {
-              finalFeatures.push({ geometry: geom, properties: { ...drawProperties } });
-            }
-          }
-
-          if (finalFeatures.length === 0) {
-            alert("Silakan gambar dan tambahkan minimal 1 objek terlebih dahulu!");
-            return;
-          }
-
-          onSaveDrawnFeature(drawingLayerId, finalFeatures);
-          setDrawPoints([]);
-          setSessionFeatures([]);
-          setDrawProperties({ nama: "Fitur Baru", keterangan: "Dibuat secara interaktif" });
-        };
-
-        return (
-          <div
-            style={{
-              transform: `translate(calc(-50% + ${drawDragOffset.x}px), ${drawDragOffset.y}px)`,
-              top: '16px',
-              left: '50%'
-            }}
-            className="absolute bg-[#0f172a]/95 border-2 border-red-500 rounded-xl shadow-2xl p-4 z-40 w-full max-w-lg text-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs select-none"
-          >
-            <div
-              onMouseDown={handleDrawDragMouseDown}
-              className="flex justify-between items-center border-b border-[#334155] pb-2 cursor-move select-none"
-              title="Seret header ini untuk memindahkan panel"
-            >
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-                <h4 className="font-bold text-xs text-slate-100 font-mono tracking-wide uppercase flex items-center gap-1.5">
-                  Mode Menggambar Multi: {targetLayer?.name || "Layer Kustom"}
-                  <span className="text-[9px] text-[#38bdf8] font-normal normal-case animate-pulse">(Seret Panel ⬘)</span>
-                </h4>
-              </div>
-              <div className="text-[10px] font-mono text-slate-400">
-                {drawPoints.length} Titik Aktif | {sessionFeatures.length} Sesi Terkumpul
-              </div>
-            </div>
-
-            <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
-              💡 <strong>Panduan:</strong> Klik peta untuk menggambar ({layerType === "fill" ? "Poligon" : layerType === "line" ? "Garis" : "Titik"}). Klik <strong>"+ Tambah Ke Sesi"</strong> untuk menampung objek, lalu buat objek berikutnya. Jika selesai, klik <strong>"Simpan Semua"</strong>.
-            </p>
-
-            {/* Form to set attributes for the current active feature */}
-            <div className="grid grid-cols-2 gap-2 text-xs bg-[#1e293b]/40 p-2.5 rounded-lg border border-[#334155]/50">
-              <div className="col-span-2 text-[10px] text-red-400 font-bold uppercase font-mono tracking-wider mb-0.5 flex justify-between">
-                <span>Atribut Objek Aktif</span>
-                <span className="text-slate-400 font-normal normal-case">
-                  ({drawPoints.length} koordinat)
-                </span>
-              </div>
-              <div>
-                <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Nama Fitur
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Titik Pos Pantau"
-                  value={drawProperties.nama}
-                  onChange={(e) => setDrawProperties((prev) => ({ ...prev, nama: e.target.value }))}
-                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 placeholder-slate-700 focus:outline-none focus:border-red-500 transition-all font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                  Keterangan
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Kondisi Baik"
-                  value={drawProperties.keterangan || ""}
-                  onChange={(e) => setDrawProperties((prev) => ({ ...prev, keterangan: e.target.value }))}
-                  className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 placeholder-slate-700 focus:outline-none focus:border-red-500 transition-all font-mono"
-                />
-              </div>
-
-              {/* Action to add the active drawing to the session list */}
-              <div className="col-span-2 pt-1">
+              <div className="flex gap-2 pt-1 border-t border-[#334155]/60">
                 <button
                   type="button"
-                  onClick={handleAddActiveToList}
-                  disabled={!isValidActiveShape}
-                  className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold font-mono rounded text-[10px] transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                  onClick={onCancelEditing}
+                  className="flex-1 py-1.5 bg-[#1e293b] hover:bg-slate-800 text-slate-300 font-bold font-mono rounded text-[10px] border border-[#334155] transition-all cursor-pointer"
                 >
-                  ➕ Tambah Objek Ke Sesi ({sessionFeatures.length + 1})
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdits}
+                  className="flex-1 py-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold font-mono rounded text-[10px] transition-all shadow-md cursor-pointer"
+                >
+                  Simpan Perubahan
                 </button>
               </div>
             </div>
+          );
+        })()}
 
-            {/* List of features added to the temporary session */}
-            {sessionFeatures.length > 0 && (
-              <div className="flex flex-col gap-1.5 bg-[#0f172a] p-2.5 rounded-lg border border-[#334155]">
-                <div className="text-[9px] text-slate-400 font-bold uppercase font-mono tracking-wider">
-                  Daftar Objek Sementara Di Sesi ({sessionFeatures.length})
+      {/* 5. FLOATING FEATURE DRAWING OVERLAY */}
+      {drawingLayerId &&
+        (() => {
+          const targetLayer = layers.find((l) => l.id === drawingLayerId);
+          const layerType = targetLayer?.type || "circle";
+
+          // Validation for the current active geometry
+          const isValidActiveShape =
+            (layerType === "circle" && drawPoints.length === 1) ||
+            (layerType === "line" && drawPoints.length >= 2) ||
+            (layerType === "fill" && drawPoints.length >= 3);
+
+          const handleAddActiveToList = () => {
+            if (!isValidActiveShape) return;
+
+            let geom: any = null;
+            if (layerType === "circle") {
+              geom = {
+                type: "Point",
+                coordinates: drawPoints[0],
+              };
+            } else if (layerType === "line") {
+              geom = {
+                type: "LineString",
+                coordinates: drawPoints,
+              };
+            } else if (layerType === "fill") {
+              geom = {
+                type: "Polygon",
+                coordinates: [[...drawPoints, drawPoints[0]]],
+              };
+            }
+
+            if (geom) {
+              setSessionFeatures((prev) => [
+                ...prev,
+                { geometry: geom, properties: { ...drawProperties } },
+              ]);
+              // Clear current drawing point & reset name
+              setDrawPoints([]);
+              setDrawProperties({
+                nama: `Objek Baru ${sessionFeatures.length + 2}`,
+                keterangan: "Dibuat secara interaktif",
+              });
+            }
+          };
+
+          const handleSaveAllAndClose = () => {
+            let finalFeatures = [...sessionFeatures];
+
+            // Automatically append active shape if it is valid
+            if (isValidActiveShape) {
+              let geom: any = null;
+              if (layerType === "circle") {
+                geom = { type: "Point", coordinates: drawPoints[0] };
+              } else if (layerType === "line") {
+                geom = { type: "LineString", coordinates: drawPoints };
+              } else if (layerType === "fill") {
+                geom = {
+                  type: "Polygon",
+                  coordinates: [[...drawPoints, drawPoints[0]]],
+                };
+              }
+              if (geom) {
+                finalFeatures.push({
+                  geometry: geom,
+                  properties: { ...drawProperties },
+                });
+              }
+            }
+
+            if (finalFeatures.length === 0) {
+              alert(
+                "Silakan gambar dan tambahkan minimal 1 objek terlebih dahulu!",
+              );
+              return;
+            }
+
+            onSaveDrawnFeature(drawingLayerId, finalFeatures);
+            setDrawPoints([]);
+            setSessionFeatures([]);
+            setDrawProperties({
+              nama: "Fitur Baru",
+              keterangan: "Dibuat secara interaktif",
+            });
+          };
+
+          return (
+            <div
+              style={{
+                transform: `translate(calc(-50% + ${drawDragOffset.x}px), ${drawDragOffset.y}px)`,
+                top: "16px",
+                left: "50%",
+              }}
+              className="absolute bg-[#0f172a]/95 border-2 border-red-500 rounded-xl shadow-2xl p-4 z-40 w-full max-w-lg text-slate-100 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs select-none"
+            >
+              <div
+                onMouseDown={handleDrawDragMouseDown}
+                className="flex justify-between items-center border-b border-[#334155] pb-2 cursor-move select-none"
+                title="Seret header ini untuk memindahkan panel"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                  <h4 className="font-bold text-xs text-slate-100 font-mono tracking-wide uppercase flex items-center gap-1.5">
+                    Mode Menggambar Multi: {targetLayer?.name || "Layer Kustom"}
+                    <span className="text-[9px] text-[#38bdf8] font-normal normal-case animate-pulse">
+                      (Seret Panel ⬘)
+                    </span>
+                  </h4>
                 </div>
-                <div className="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1 scrollbar-thin">
-                  {sessionFeatures.map((f, idx) => (
-                    <div
-                      key={idx}
-                      className="flex justify-between items-center bg-[#1e293b]/70 px-2 py-1.5 rounded border border-[#334155]/60 text-[10px]"
-                    >
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-slate-200 truncate font-mono">
-                          {idx + 1}. {f.properties.nama}
-                        </span>
-                        <span className="text-[9px] text-slate-400 truncate max-w-[280px]">
-                          {f.properties.keterangan || "-"}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSessionFeatures((prev) => prev.filter((_, i) => i !== idx))}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1 rounded transition-all cursor-pointer flex items-center justify-center"
-                        title="Hapus objek ini"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                <div className="text-[10px] font-mono text-slate-400">
+                  {drawPoints.length} Titik Aktif | {sessionFeatures.length}{" "}
+                  Sesi Terkumpul
                 </div>
               </div>
-            )}
 
-            <div className="flex gap-2 pt-1 border-t border-[#334155]/60">
-              <button
-                type="button"
-                onClick={() => {
-                  setDrawPoints([]);
-                  setSessionFeatures([]);
-                  setDrawProperties({ nama: "Fitur Baru", keterangan: "Dibuat secara interaktif" });
-                  onSaveDrawnFeature(drawingLayerId, null, null);
-                }}
-                className="flex-1 py-1.5 bg-[#1e293b] hover:bg-slate-800 text-slate-300 font-bold font-mono rounded text-[10px] border border-[#334155] transition-all cursor-pointer"
-              >
-                Batalkan
-              </button>
-              
-              {drawPoints.length > 0 && (
+              <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
+                💡 <strong>Panduan:</strong> Klik peta untuk menggambar (
+                {layerType === "fill"
+                  ? "Poligon"
+                  : layerType === "line"
+                    ? "Garis"
+                    : "Titik"}
+                ). Klik <strong>"+ Tambah Ke Sesi"</strong> untuk menampung
+                objek, lalu buat objek berikutnya. Jika selesai, klik{" "}
+                <strong>"Simpan Semua"</strong>.
+              </p>
+
+              {/* Form to set attributes for the current active feature */}
+              <div className="grid grid-cols-2 gap-2 text-xs bg-[#1e293b]/40 p-2.5 rounded-lg border border-[#334155]/50">
+                <div className="col-span-2 text-[10px] text-red-400 font-bold uppercase font-mono tracking-wider mb-0.5 flex justify-between">
+                  <span>Atribut Objek Aktif</span>
+                  <span className="text-slate-400 font-normal normal-case">
+                    ({drawPoints.length} koordinat)
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Nama Fitur
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Titik Pos Pantau"
+                    value={drawProperties.nama}
+                    onChange={(e) =>
+                      setDrawProperties((prev) => ({
+                        ...prev,
+                        nama: e.target.value,
+                      }))
+                    }
+                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 placeholder-slate-700 focus:outline-none focus:border-red-500 transition-all font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                    Keterangan
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Kondisi Baik"
+                    value={drawProperties.keterangan || ""}
+                    onChange={(e) =>
+                      setDrawProperties((prev) => ({
+                        ...prev,
+                        keterangan: e.target.value,
+                      }))
+                    }
+                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-slate-200 placeholder-slate-700 focus:outline-none focus:border-red-500 transition-all font-mono"
+                  />
+                </div>
+
+                {/* Action to add the active drawing to the session list */}
+                <div className="col-span-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAddActiveToList}
+                    disabled={!isValidActiveShape}
+                    className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold font-mono rounded text-[10px] transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    ➕ Tambah Objek Ke Sesi ({sessionFeatures.length + 1})
+                  </button>
+                </div>
+              </div>
+
+              {/* List of features added to the temporary session */}
+              {sessionFeatures.length > 0 && (
+                <div className="flex flex-col gap-1.5 bg-[#0f172a] p-2.5 rounded-lg border border-[#334155]">
+                  <div className="text-[9px] text-slate-400 font-bold uppercase font-mono tracking-wider">
+                    Daftar Objek Sementara Di Sesi ({sessionFeatures.length})
+                  </div>
+                  <div className="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1 scrollbar-thin">
+                    {sessionFeatures.map((f, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center bg-[#1e293b]/70 px-2 py-1.5 rounded border border-[#334155]/60 text-[10px]"
+                      >
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-slate-200 truncate font-mono">
+                            {idx + 1}. {f.properties.nama}
+                          </span>
+                          <span className="text-[9px] text-slate-400 truncate max-w-[280px]">
+                            {f.properties.keterangan || "-"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSessionFeatures((prev) =>
+                              prev.filter((_, i) => i !== idx),
+                            )
+                          }
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1 rounded transition-all cursor-pointer flex items-center justify-center"
+                          title="Hapus objek ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1 border-t border-[#334155]/60">
                 <button
                   type="button"
                   onClick={() => {
                     setDrawPoints([]);
+                    setSessionFeatures([]);
+                    setDrawProperties({
+                      nama: "Fitur Baru",
+                      keterangan: "Dibuat secara interaktif",
+                    });
+                    onSaveDrawnFeature(drawingLayerId, null, null);
                   }}
-                  className="py-1.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold font-mono rounded text-[10px] border border-amber-500/20 transition-all cursor-pointer"
+                  className="flex-1 py-1.5 bg-[#1e293b] hover:bg-slate-800 text-slate-300 font-bold font-mono rounded text-[10px] border border-[#334155] transition-all cursor-pointer"
                 >
-                  Reset Aktif
+                  Batalkan
                 </button>
-              )}
 
-              <button
-                type="button"
-                onClick={handleSaveAllAndClose}
-                disabled={sessionFeatures.length === 0 && !isValidActiveShape}
-                className="flex-1 py-1.5 bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:hover:bg-red-500 text-white font-bold font-mono rounded text-[10px] transition-all shadow-md cursor-pointer flex items-center justify-center gap-1"
-              >
-                💾 Simpan Semua ({sessionFeatures.length + (isValidActiveShape ? 1 : 0)})
-              </button>
+                {drawPoints.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDrawPoints([]);
+                    }}
+                    className="py-1.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold font-mono rounded text-[10px] border border-amber-500/20 transition-all cursor-pointer"
+                  >
+                    Reset Aktif
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleSaveAllAndClose}
+                  disabled={sessionFeatures.length === 0 && !isValidActiveShape}
+                  className="flex-1 py-1.5 bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:hover:bg-red-500 text-white font-bold font-mono rounded text-[10px] transition-all shadow-md cursor-pointer flex items-center justify-center gap-1"
+                >
+                  💾 Simpan Semua (
+                  {sessionFeatures.length + (isValidActiveShape ? 1 : 0)})
+                </button>
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* 6. PRINT AND EXPORT MAP LAYOUT MODAL */}
       {printDialogOpen && (
         <div className="fixed inset-0 bg-slate-950/98 z-50 flex flex-col md:flex-row p-4 gap-4 overflow-y-auto animate-in fade-in duration-300">
           {/* Print Style Injector */}
-          <style dangerouslySetInnerHTML={{ __html: `
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
             @media print {
               /* Hide everything else on the page */
               body, html, #root {
@@ -2983,14 +3312,18 @@ export default function MapContainer({
                 margin: 2px;
               }
             }
-          `}} />
+          `,
+            }}
+          />
 
           {/* Left panel: Control settings */}
           <div className="w-full md:w-80 bg-[#0f172a] border border-[#334155] rounded-xl p-4 flex flex-col gap-4 text-slate-200 shrink-0 shadow-2xl">
             <div className="flex justify-between items-center border-b border-[#334155] pb-2">
               <div className="flex items-center gap-2">
                 <Printer className="w-4 h-4 text-[#38bdf8]" />
-                <h3 className="font-bold text-sm tracking-wide text-slate-100 font-mono">LAYOUT CETAK</h3>
+                <h3 className="font-bold text-sm tracking-wide text-slate-100 font-mono">
+                  LAYOUT CETAK
+                </h3>
               </div>
               <button
                 onClick={() => setPrintDialogOpen(false)}
@@ -3266,7 +3599,9 @@ export default function MapContainer({
                   <div className="space-y-2.5 bg-slate-900/50 p-2.5 border border-[#334155]/30 rounded-lg">
                     {/* Toggle Legenda */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-medium text-slate-300">Tampilkan Legenda</span>
+                      <span className="text-[11px] font-mono font-medium text-slate-300">
+                        Tampilkan Legenda
+                      </span>
                       <button
                         onClick={() => setPrintShowLegend(!printShowLegend)}
                         className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
@@ -3281,7 +3616,9 @@ export default function MapContainer({
 
                     {/* Toggle Kompas */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-medium text-slate-300">Tampilkan Arah Utara</span>
+                      <span className="text-[11px] font-mono font-medium text-slate-300">
+                        Tampilkan Arah Utara
+                      </span>
                       <button
                         onClick={() => setPrintShowCompass(!printShowCompass)}
                         className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
@@ -3296,7 +3633,9 @@ export default function MapContainer({
 
                     {/* Toggle Skala */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-medium text-slate-300">Tampilkan Skala Bar</span>
+                      <span className="text-[11px] font-mono font-medium text-slate-300">
+                        Tampilkan Skala Bar
+                      </span>
                       <button
                         onClick={() => setPrintShowScale(!printShowScale)}
                         className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
@@ -3368,11 +3707,14 @@ export default function MapContainer({
 
                 {/* Edit Selected Element Properties */}
                 {(() => {
-                  const el = printLayoutElements.find(item => item.id === selectedElementId);
+                  const el = printLayoutElements.find(
+                    (item) => item.id === selectedElementId,
+                  );
                   if (!el) {
                     return (
                       <div className="bg-slate-900/40 border border-[#334155]/40 rounded-lg p-2.5 text-center text-xs text-slate-400 font-mono">
-                        Pilih objek di kertas atau daftar di bawah untuk mengeditnya.
+                        Pilih objek di kertas atau daftar di bawah untuk
+                        mengeditnya.
                       </div>
                     );
                   }
@@ -3385,7 +3727,9 @@ export default function MapContainer({
                         </span>
                         <button
                           onClick={() => {
-                            setPrintLayoutElements(prev => prev.filter(item => item.id !== el.id));
+                            setPrintLayoutElements((prev) =>
+                              prev.filter((item) => item.id !== el.id),
+                            );
                             setSelectedElementId(null);
                           }}
                           className="text-red-400 hover:text-red-300 p-1 hover:bg-red-500/10 rounded transition-all cursor-pointer"
@@ -3398,24 +3742,36 @@ export default function MapContainer({
                       {/* Position X and Y percentage sliders */}
                       <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
                         <div>
-                          <span className="text-slate-400">Posisi X: {el.x}%</span>
+                          <span className="text-slate-400">
+                            Posisi X: {el.x}%
+                          </span>
                           <input
                             type="range"
                             min="0"
                             max="100"
                             value={el.x}
-                            onChange={(e) => updateSelectedElement({ x: parseInt(e.target.value) })}
+                            onChange={(e) =>
+                              updateSelectedElement({
+                                x: parseInt(e.target.value),
+                              })
+                            }
                             className="w-full accent-sky-500 cursor-pointer"
                           />
                         </div>
                         <div>
-                          <span className="text-slate-400">Posisi Y: {el.y}%</span>
+                          <span className="text-slate-400">
+                            Posisi Y: {el.y}%
+                          </span>
                           <input
                             type="range"
                             min="0"
                             max="100"
                             value={el.y}
-                            onChange={(e) => updateSelectedElement({ y: parseInt(e.target.value) })}
+                            onChange={(e) =>
+                              updateSelectedElement({
+                                y: parseInt(e.target.value),
+                              })
+                            }
                             className="w-full accent-sky-500 cursor-pointer"
                           />
                         </div>
@@ -3425,38 +3781,60 @@ export default function MapContainer({
                       {el.type === "text" && (
                         <div className="flex flex-col gap-2 text-xs">
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Isi Teks</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Isi Teks
+                            </span>
                             <input
                               type="text"
                               value={el.content || ""}
-                              onChange={(e) => updateSelectedElement({ content: e.target.value })}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  content: e.target.value,
+                                })
+                              }
                               className="w-full bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] font-mono"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Ukuran Font ({el.fontSize}px)</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Ukuran Font ({el.fontSize}px)
+                            </span>
                             <input
                               type="range"
                               min="8"
                               max="120"
                               value={el.fontSize || 14}
-                              onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) })}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  fontSize: parseInt(e.target.value),
+                                })
+                              }
                               className="w-full accent-sky-500 cursor-pointer"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Warna Teks</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Warna Teks
+                            </span>
                             <div className="flex items-center gap-2">
                               <input
                                 type="color"
                                 value={el.fontColor || "#000000"}
-                                onChange={(e) => updateSelectedElement({ fontColor: e.target.value })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    fontColor: e.target.value,
+                                  })
+                                }
                                 className="w-8 h-7 bg-transparent border-0 cursor-pointer"
                               />
                               <input
                                 type="text"
                                 value={el.fontColor || "#000000"}
-                                onChange={(e) => updateSelectedElement({ fontColor: e.target.value })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    fontColor: e.target.value,
+                                  })
+                                }
                                 className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
                               />
                             </div>
@@ -3467,51 +3845,79 @@ export default function MapContainer({
                       {el.type === "line" && (
                         <div className="flex flex-col gap-2 text-xs">
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Panjang Garis ({el.width}px)</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Panjang Garis ({el.width}px)
+                            </span>
                             <input
                               type="range"
                               min="10"
                               max="600"
                               value={el.width || 100}
-                              onChange={(e) => updateSelectedElement({ width: parseInt(e.target.value) })}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  width: parseInt(e.target.value),
+                                })
+                              }
                               className="w-full accent-sky-500 cursor-pointer"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Ketebalan ({el.lineWidth}px)</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Ketebalan ({el.lineWidth}px)
+                            </span>
                             <input
                               type="range"
                               min="1"
                               max="20"
                               value={el.lineWidth || 2}
-                              onChange={(e) => updateSelectedElement({ lineWidth: parseInt(e.target.value) })}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  lineWidth: parseInt(e.target.value),
+                                })
+                              }
                               className="w-full accent-sky-500 cursor-pointer"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Rotasi ({el.rotation || 0}°)</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Rotasi ({el.rotation || 0}°)
+                            </span>
                             <input
                               type="range"
                               min="0"
                               max="360"
                               value={el.rotation || 0}
-                              onChange={(e) => updateSelectedElement({ rotation: parseInt(e.target.value) })}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  rotation: parseInt(e.target.value),
+                                })
+                              }
                               className="w-full accent-sky-500 cursor-pointer"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Warna Garis</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Warna Garis
+                            </span>
                             <div className="flex items-center gap-2">
                               <input
                                 type="color"
                                 value={el.lineColor || "#ff0000"}
-                                onChange={(e) => updateSelectedElement({ lineColor: e.target.value })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    lineColor: e.target.value,
+                                  })
+                                }
                                 className="w-8 h-7 bg-transparent border-0 cursor-pointer"
                               />
                               <input
                                 type="text"
                                 value={el.lineColor || "#ff0000"}
-                                onChange={(e) => updateSelectedElement({ lineColor: e.target.value })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    lineColor: e.target.value,
+                                  })
+                                }
                                 className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
                               />
                             </div>
@@ -3523,79 +3929,134 @@ export default function MapContainer({
                         <div className="flex flex-col gap-2 text-xs">
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Lebar ({el.width}px)</span>
+                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                                Lebar ({el.width}px)
+                              </span>
                               <input
                                 type="range"
                                 min="10"
                                 max="600"
                                 value={el.width || 120}
-                                onChange={(e) => updateSelectedElement({ width: parseInt(e.target.value) })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    width: parseInt(e.target.value),
+                                  })
+                                }
                                 className="w-full accent-sky-500 cursor-pointer"
                               />
                             </div>
                             <div>
-                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Tinggi ({el.height}px)</span>
+                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                                Tinggi ({el.height}px)
+                              </span>
                               <input
                                 type="range"
                                 min="10"
                                 max="400"
                                 value={el.height || 60}
-                                onChange={(e) => updateSelectedElement({ height: parseInt(e.target.value) })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    height: parseInt(e.target.value),
+                                  })
+                                }
                                 className="w-full accent-sky-500 cursor-pointer"
                               />
                             </div>
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Tebal Bingkai ({el.rectBorderWidth}px)</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Tebal Bingkai ({el.rectBorderWidth}px)
+                            </span>
                             <input
                               type="range"
                               min="0"
                               max="20"
-                              value={el.rectBorderWidth === undefined ? 2 : el.rectBorderWidth}
-                              onChange={(e) => updateSelectedElement({ rectBorderWidth: parseInt(e.target.value) })}
+                              value={
+                                el.rectBorderWidth === undefined
+                                  ? 2
+                                  : el.rectBorderWidth
+                              }
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  rectBorderWidth: parseInt(e.target.value),
+                                })
+                              }
                               className="w-full accent-sky-500 cursor-pointer"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Warna Bingkai</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Warna Bingkai
+                            </span>
                             <div className="flex items-center gap-2">
                               <input
                                 type="color"
                                 value={el.rectBorderColor || "#000000"}
-                                onChange={(e) => updateSelectedElement({ rectBorderColor: e.target.value })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    rectBorderColor: e.target.value,
+                                  })
+                                }
                                 className="w-8 h-7 bg-transparent border-0 cursor-pointer"
                               />
                               <input
                                 type="text"
                                 value={el.rectBorderColor || "#000000"}
-                                onChange={(e) => updateSelectedElement({ rectBorderColor: e.target.value })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    rectBorderColor: e.target.value,
+                                  })
+                                }
                                 className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
                               />
                             </div>
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Warna Latar (Fill)</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Warna Latar (Fill)
+                            </span>
                             <div className="flex items-center gap-2">
                               <input
                                 type="color"
-                                value={el.rectFillColor && el.rectFillColor.startsWith("rgba") ? "#ffffff" : el.rectFillColor || "#ffffff"}
-                                onChange={(e) => updateSelectedElement({ rectFillColor: e.target.value })}
+                                value={
+                                  el.rectFillColor &&
+                                  el.rectFillColor.startsWith("rgba")
+                                    ? "#ffffff"
+                                    : el.rectFillColor || "#ffffff"
+                                }
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    rectFillColor: e.target.value,
+                                  })
+                                }
                                 className="w-8 h-7 bg-transparent border-0 cursor-pointer"
                                 disabled={el.rectFillColor === "rgba(0,0,0,0)"}
                               />
                               <select
-                                value={el.rectFillColor === "rgba(0,0,0,0)" ? "transparan" : "solid"}
+                                value={
+                                  el.rectFillColor === "rgba(0,0,0,0)"
+                                    ? "transparan"
+                                    : "solid"
+                                }
                                 onChange={(e) => {
                                   if (e.target.value === "transparan") {
-                                    updateSelectedElement({ rectFillColor: "rgba(0,0,0,0)" });
+                                    updateSelectedElement({
+                                      rectFillColor: "rgba(0,0,0,0)",
+                                    });
                                   } else {
-                                    updateSelectedElement({ rectFillColor: "#ffffff" });
+                                    updateSelectedElement({
+                                      rectFillColor: "#ffffff",
+                                    });
                                   }
                                 }}
                                 className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs font-mono text-slate-200 focus:outline-none"
                               >
-                                <option value="solid font-mono">Isi Warna Solid</option>
-                                <option value="transparan font-mono">Transparan (Tanpa Latar)</option>
+                                <option value="solid font-mono">
+                                  Isi Warna Solid
+                                </option>
+                                <option value="transparan font-mono">
+                                  Transparan (Tanpa Latar)
+                                </option>
                               </select>
                             </div>
                           </div>
@@ -3605,68 +4066,107 @@ export default function MapContainer({
                       {el.type === "image" && (
                         <div className="flex flex-col gap-2 text-xs">
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Preset Gambar / Kompas</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Preset Gambar / Kompas
+                            </span>
                             <select
-                              value={el.imageUrl === CLASSIC_NORTH_ARROW ? "classic" : el.imageUrl === MODERN_NORTH_ARROW ? "modern" : "custom"}
+                              value={
+                                el.imageUrl === CLASSIC_NORTH_ARROW
+                                  ? "classic"
+                                  : el.imageUrl === MODERN_NORTH_ARROW
+                                    ? "modern"
+                                    : "custom"
+                              }
                               onChange={(e) => {
                                 if (e.target.value === "classic") {
-                                  updateSelectedElement({ imageUrl: CLASSIC_NORTH_ARROW });
+                                  updateSelectedElement({
+                                    imageUrl: CLASSIC_NORTH_ARROW,
+                                  });
                                 } else if (e.target.value === "modern") {
-                                  updateSelectedElement({ imageUrl: MODERN_NORTH_ARROW });
+                                  updateSelectedElement({
+                                    imageUrl: MODERN_NORTH_ARROW,
+                                  });
                                 } else {
                                   updateSelectedElement({ imageUrl: "" });
                                 }
                               }}
                               className="w-full bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs font-mono text-slate-200 mb-1.5 focus:outline-none"
                             >
-                              <option value="classic">Kompas Klasik (North Arrow 1)</option>
-                              <option value="modern">Kompas Modern (North Arrow 2)</option>
-                              <option value="custom">Gambar Kustom (Upload)</option>
+                              <option value="classic">
+                                Kompas Klasik (North Arrow 1)
+                              </option>
+                              <option value="modern">
+                                Kompas Modern (North Arrow 2)
+                              </option>
+                              <option value="custom">
+                                Gambar Kustom (Upload)
+                              </option>
                             </select>
-                            
-                            {(el.imageUrl !== CLASSIC_NORTH_ARROW && el.imageUrl !== MODERN_NORTH_ARROW) && (
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => handleUploadElementImage(e, el.id)}
-                                className="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-sky-500/10 file:text-sky-400 cursor-pointer"
-                              />
-                            )}
+
+                            {el.imageUrl !== CLASSIC_NORTH_ARROW &&
+                              el.imageUrl !== MODERN_NORTH_ARROW && (
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) =>
+                                    handleUploadElementImage(e, el.id)
+                                  }
+                                  className="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-sky-500/10 file:text-sky-400 cursor-pointer"
+                                />
+                              )}
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Lebar ({el.width}px)</span>
+                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                                Lebar ({el.width}px)
+                              </span>
                               <input
                                 type="range"
                                 min="10"
                                 max="400"
                                 value={el.width || 60}
-                                onChange={(e) => updateSelectedElement({ width: parseInt(e.target.value) })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    width: parseInt(e.target.value),
+                                  })
+                                }
                                 className="w-full accent-sky-500 cursor-pointer"
                               />
                             </div>
                             <div>
-                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Tinggi ({el.height}px)</span>
+                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                                Tinggi ({el.height}px)
+                              </span>
                               <input
                                 type="range"
                                 min="10"
                                 max="400"
                                 value={el.height || 60}
-                                onChange={(e) => updateSelectedElement({ height: parseInt(e.target.value) })}
+                                onChange={(e) =>
+                                  updateSelectedElement({
+                                    height: parseInt(e.target.value),
+                                  })
+                                }
                                 className="w-full accent-sky-500 cursor-pointer"
                               />
                             </div>
                           </div>
 
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">Rotasi ({el.rotation || 0}°)</span>
+                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              Rotasi ({el.rotation || 0}°)
+                            </span>
                             <input
                               type="range"
                               min="0"
                               max="360"
                               value={el.rotation || 0}
-                              onChange={(e) => updateSelectedElement({ rotation: parseInt(e.target.value) })}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  rotation: parseInt(e.target.value),
+                                })
+                              }
                               className="w-full accent-sky-500 cursor-pointer"
                             />
                           </div>
@@ -3693,20 +4193,35 @@ export default function MapContainer({
                         }`}
                       >
                         <div className="flex items-center gap-1.5 truncate">
-                          <span className="text-[10px] font-mono text-slate-500">{idx + 1}.</span>
-                          {item.type === "text" && <Type className="w-3.5 h-3.5 shrink-0 text-sky-400" />}
-                          {item.type === "line" && <Slash className="w-3.5 h-3.5 shrink-0 text-red-400" />}
-                          {item.type === "rectangle" && <Square className="w-3.5 h-3.5 shrink-0 text-emerald-400" />}
-                          {item.type === "image" && <ImageIcon className="w-3.5 h-3.5 shrink-0 text-amber-400" />}
+                          <span className="text-[10px] font-mono text-slate-500">
+                            {idx + 1}.
+                          </span>
+                          {item.type === "text" && (
+                            <Type className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+                          )}
+                          {item.type === "line" && (
+                            <Slash className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                          )}
+                          {item.type === "rectangle" && (
+                            <Square className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                          )}
+                          {item.type === "image" && (
+                            <ImageIcon className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                          )}
                           <span className="truncate leading-none text-[11px]">
-                            {item.type === "text" ? item.content : `${item.type.toUpperCase()} (X:${item.x}%, Y:${item.y}%)`}
+                            {item.type === "text"
+                              ? item.content
+                              : `${item.type.toUpperCase()} (X:${item.x}%, Y:${item.y}%)`}
                           </span>
                         </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setPrintLayoutElements(prev => prev.filter(p => p.id !== item.id));
-                            if (selectedElementId === item.id) setSelectedElementId(null);
+                            setPrintLayoutElements((prev) =>
+                              prev.filter((p) => p.id !== item.id),
+                            );
+                            if (selectedElementId === item.id)
+                              setSelectedElementId(null);
                           }}
                           className="text-slate-500 hover:text-red-400 p-0.5 rounded"
                         >
@@ -3740,7 +4255,9 @@ export default function MapContainer({
                 disabled={!capturedMapUrl}
                 className="w-full py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800/40 disabled:cursor-not-allowed text-slate-200 border border-[#334155] font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Download className={`w-4 h-4 ${capturedMapUrl ? 'text-emerald-400' : 'text-slate-500'}`} />
+                <Download
+                  className={`w-4 h-4 ${capturedMapUrl ? "text-emerald-400" : "text-slate-500"}`}
+                />
                 Unduh Gambar Peta (PNG)
               </button>
 
@@ -3762,14 +4279,16 @@ export default function MapContainer({
                 className={`bg-white text-black border-4 border-double border-black shadow-2xl flex ${
                   printOrientation === "portrait" ? "flex-col" : "flex-row"
                 } gap-4 w-full ${
-                  printOrientation === "landscape" ? "aspect-[1.414]" : "aspect-[0.707]"
+                  printOrientation === "landscape"
+                    ? "aspect-[1.414]"
+                    : "aspect-[0.707]"
                 }`}
                 style={{
                   maxHeight: "80vh",
                   width: "100%",
                   boxSizing: "border-box",
                   margin: "2px",
-                  padding: "2px"
+                  padding: "2px",
                 }}
               >
                 {/* A. MAP FRAME SECTION */}
@@ -3780,7 +4299,9 @@ export default function MapContainer({
                       alt="Peta Spasial"
                       className="w-full h-full object-cover"
                       onError={() => {
-                        console.error("Gagal memuat gambar peta yang ditangkap");
+                        console.error(
+                          "Gagal memuat gambar peta yang ditangkap",
+                        );
                         setCapturedMapUrl(null);
                       }}
                     />
@@ -3788,11 +4309,13 @@ export default function MapContainer({
                     <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
                       <div className="w-12 h-12 border-4 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
                       <span className="text-sm font-mono font-bold text-slate-500">
-                        {isCapturing ? "Mengambil gambar peta..." : "Gagal menangkap peta. Silakan tutup dan coba lagi."}
+                        {isCapturing
+                          ? "Mengambil gambar peta..."
+                          : "Gagal menangkap peta. Silakan tutup dan coba lagi."}
                       </span>
                     </div>
                   )}
-                  
+
                   {/* Grid or Scale ticks overlay inside map frame for decoration */}
                   {printProjection && (
                     <div className="absolute top-2 left-2 bg-white/80 border border-black px-1.5 py-0.5 text-[8px] font-mono font-bold tracking-tight rounded pointer-events-none select-none text-black">
@@ -3812,9 +4335,13 @@ export default function MapContainer({
                         <span className="w-8 text-left">0</span>
                         <span className="w-8 text-center">1</span>
                         <span className="w-8 text-center">2</span>
-                        <span className="w-8 text-right">{printScaleBarKm}</span>
+                        <span className="w-8 text-right">
+                          {printScaleBarKm}
+                        </span>
                       </div>
-                      <span className="text-[7px] font-mono font-bold mt-0.5">{printScaleText || "1:25.000"}</span>
+                      <span className="text-[7px] font-mono font-bold mt-0.5">
+                        {printScaleText || "1:25.000"}
+                      </span>
                     </div>
                   )}
                   {/* Creator / Source text */}
@@ -3825,7 +4352,7 @@ export default function MapContainer({
                   {/* Dynamic Print Layout Overlay Elements */}
                   {printLayoutElements.map((el) => {
                     const isSelected = el.id === selectedElementId;
-                    
+
                     return (
                       <div
                         key={el.id}
@@ -3836,8 +4363,8 @@ export default function MapContainer({
                           setSelectedElementId(el.id);
                         }}
                         className={`absolute select-none cursor-move group transition-all duration-75 ${
-                          isSelected 
-                            ? "ring-2 ring-sky-400 ring-offset-1 print:ring-0 print:ring-offset-0 z-50" 
+                          isSelected
+                            ? "ring-2 ring-sky-400 ring-offset-1 print:ring-0 print:ring-offset-0 z-50"
                             : "hover:ring-1 hover:ring-slate-400 z-40"
                         }`}
                         style={{
@@ -3845,7 +4372,7 @@ export default function MapContainer({
                           top: `${el.y}%`,
                           transform: "translate(-50%, -50%)",
                           padding: "4px",
-                          borderRadius: "2px"
+                          borderRadius: "2px",
                         }}
                       >
                         {/* Selector badge */}
@@ -3854,7 +4381,7 @@ export default function MapContainer({
                             ✓
                           </div>
                         )}
-                        
+
                         {el.type === "text" && (
                           <div
                             style={{
@@ -3862,7 +4389,7 @@ export default function MapContainer({
                               color: el.fontColor || "#000000",
                               fontWeight: "bold",
                               whiteSpace: "nowrap",
-                              fontFamily: "var(--font-sans)"
+                              fontFamily: "var(--font-sans)",
                             }}
                           >
                             {el.content}
@@ -3876,7 +4403,7 @@ export default function MapContainer({
                               height: `${el.lineWidth || 2}px`,
                               backgroundColor: el.lineColor || "#ff0000",
                               transform: `rotate(${el.rotation || 0}deg)`,
-                              transformOrigin: "center"
+                              transformOrigin: "center",
                             }}
                           />
                         )}
@@ -3886,8 +4413,9 @@ export default function MapContainer({
                             style={{
                               width: `${el.width || 120}px`,
                               height: `${el.height || 60}px`,
-                              backgroundColor: el.rectFillColor || "rgba(255,255,255,0.7)",
-                              border: `${el.rectBorderWidth === undefined ? 2 : el.rectBorderWidth}px solid ${el.rectBorderColor || "#000000"}`
+                              backgroundColor:
+                                el.rectFillColor || "rgba(255,255,255,0.7)",
+                              border: `${el.rectBorderWidth === undefined ? 2 : el.rectBorderWidth}px solid ${el.rectBorderColor || "#000000"}`,
                             }}
                           />
                         )}
@@ -3902,7 +4430,7 @@ export default function MapContainer({
                               height: `${el.height || 60}px`,
                               transform: `rotate(${el.rotation || 0}deg)`,
                               transformOrigin: "center",
-                              objectFit: "contain"
+                              objectFit: "contain",
                             }}
                           />
                         )}
@@ -3930,9 +4458,15 @@ export default function MapContainer({
                           </div>
                         )}
                         <div className="leading-tight">
-                          <h4 className="font-sans font-extrabold text-[9px] tracking-wider">{printGovernmentName}</h4>
-                          <h4 className="font-sans font-extrabold text-[10px] tracking-wider uppercase">{printRegionName}</h4>
-                          <p className="text-[7px] text-slate-600 font-medium font-mono leading-none mt-0.5">{printProvinceName}</p>
+                          <h4 className="font-sans font-extrabold text-[9px] tracking-wider">
+                            {printGovernmentName}
+                          </h4>
+                          <h4 className="font-sans font-extrabold text-[10px] tracking-wider uppercase">
+                            {printRegionName}
+                          </h4>
+                          <p className="text-[7px] text-slate-600 font-medium font-mono leading-none mt-0.5">
+                            {printProvinceName}
+                          </p>
                         </div>
                       </div>
 
@@ -3942,7 +4476,8 @@ export default function MapContainer({
                           {printTitle || "PETA SPASIAL KOTA"}
                         </h2>
                         <p className="text-[8px] font-mono mt-1 text-center font-medium leading-normal text-slate-700">
-                          {printSubtitle || "Badan Perencanaan Pembangunan Daerah"}
+                          {printSubtitle ||
+                            "Badan Perencanaan Pembangunan Daerah"}
                         </p>
                       </div>
 
@@ -3951,49 +4486,83 @@ export default function MapContainer({
                         <div className="border-b-2 border-black pb-2.5 flex justify-center items-center gap-4 py-1">
                           <div className="flex flex-col items-center">
                             <Compass className="w-8 h-8 text-black" />
-                            <span className="text-[7px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
-                          </div>                        
+                            <span className="text-[7px] font-bold mt-0.5 font-mono">
+                              NORTH / UTARA
+                            </span>
+                          </div>
                         </div>
                       )}
 
                       {/* Dynamic Legend Block */}
                       {printShowLegend && (
                         <div className="flex flex-col gap-1.5 border-b-2 border-black pb-2.5">
-                          <h5 className="font-bold text-[9px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">LEGENDA PETA</h5>
+                          <h5 className="font-bold text-[9px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">
+                            LEGENDA PETA
+                          </h5>
                           <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
                             {/* Standard Layers */}
                             <div className="flex items-center gap-2 text-[9px]">
                               <div className="w-4 h-2.5 border border-black bg-emerald-500/10" />
-                              <span className="font-mono text-[8px] leading-tight">Batas Administrasi Kecamatan</span>
+                              <span className="font-mono text-[8px] leading-tight">
+                                Batas Administrasi Kecamatan
+                              </span>
                             </div>
                             <div className="flex items-center gap-2 text-[9px]">
                               <div className="w-4 h-0.5 bg-red-500" />
-                              <span className="font-mono text-[8px] leading-tight">Jaringan Jalan Utama</span>
+                              <span className="font-mono text-[8px] leading-tight">
+                                Jaringan Jalan Utama
+                              </span>
                             </div>
                             <div className="flex items-center gap-2 text-[9px]">
                               <div className="w-4 h-0.5 bg-blue-500" />
-                              <span className="font-mono text-[8px] leading-tight">Hidrologi Aliran Sungai</span>
+                              <span className="font-mono text-[8px] leading-tight">
+                                Hidrologi Aliran Sungai
+                              </span>
                             </div>
                             <div className="flex items-center gap-2 text-[9px]">
                               <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black" />
-                              <span className="font-mono text-[8px] leading-tight">Titik Landmark & Fasilitas</span>
+                              <span className="font-mono text-[8px] leading-tight">
+                                Titik Landmark & Fasilitas
+                              </span>
                             </div>
 
                             {/* Dynamic Active Layers from Application */}
-                            {layers.filter(l => l.visible).map((l) => (
-                              <div key={l.id} className="flex items-center gap-2 text-[9px]">
-                                {l.type === "fill" && (
-                                  <div className="w-4 h-2.5 border border-black" style={{ backgroundColor: l.color || "#94a3b8" }} />
-                                )}
-                                {l.type === "line" && (
-                                  <div className="w-4 h-0.5" style={{ backgroundColor: l.color || "#ef4444" }} />
-                                )}
-                                {l.type === "circle" && (
-                                  <div className="w-2.5 h-2.5 rounded-full border border-black" style={{ backgroundColor: l.color || "#3b82f6" }} />
-                                )}
-                                <span className="font-mono text-[8px] truncate leading-tight capitalize">{l.name}</span>
-                              </div>
-                            ))}
+                            {layers
+                              .filter((l) => l.visible)
+                              .map((l) => (
+                                <div
+                                  key={l.id}
+                                  className="flex items-center gap-2 text-[9px]"
+                                >
+                                  {l.type === "fill" && (
+                                    <div
+                                      className="w-4 h-2.5 border border-black"
+                                      style={{
+                                        backgroundColor: l.color || "#94a3b8",
+                                      }}
+                                    />
+                                  )}
+                                  {l.type === "line" && (
+                                    <div
+                                      className="w-4 h-0.5"
+                                      style={{
+                                        backgroundColor: l.color || "#ef4444",
+                                      }}
+                                    />
+                                  )}
+                                  {l.type === "circle" && (
+                                    <div
+                                      className="w-2.5 h-2.5 rounded-full border border-black"
+                                      style={{
+                                        backgroundColor: l.color || "#3b82f6",
+                                      }}
+                                    />
+                                  )}
+                                  <span className="font-mono text-[8px] truncate leading-tight capitalize">
+                                    {l.name}
+                                  </span>
+                                </div>
+                              ))}
                           </div>
                         </div>
                       )}
@@ -4001,10 +4570,25 @@ export default function MapContainer({
 
                     {/* Footer metadata block */}
                     <div className="border-t-2 border-black pt-2 text-[7px] font-mono text-slate-500 flex flex-col gap-0.5">
-                      <div className="truncate">{printSourceText || "Sumber: Bappeda Banda Aceh"}</div>
-                      {printShowScale && <div className="truncate">Skala: {printScaleText || "1:25.000"}</div>}
-                      <div className="truncate">Tanggal Cetak: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-                      <div className="font-bold text-[6px] tracking-wider uppercase border-t border-slate-200 mt-1 pt-0.5 truncate">KARTOGRAFER: {printCartographer}</div>
+                      <div className="truncate">
+                        {printSourceText || "Sumber: Bappeda Banda Aceh"}
+                      </div>
+                      {printShowScale && (
+                        <div className="truncate">
+                          Skala: {printScaleText || "1:25.000"}
+                        </div>
+                      )}
+                      <div className="truncate">
+                        Tanggal Cetak:{" "}
+                        {new Date().toLocaleDateString("id-ID", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </div>
+                      <div className="font-bold text-[6px] tracking-wider uppercase border-t border-slate-200 mt-1 pt-0.5 truncate">
+                        KARTOGRAFER: {printCartographer}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -4025,54 +4609,91 @@ export default function MapContainer({
                           </div>
                         )}
                         <div className="leading-tight">
-                          <h4 className="font-sans font-extrabold text-[8px] uppercase tracking-wider leading-none">{printGovernmentName}</h4>
-                          <h4 className="font-sans font-extrabold text-[9px] uppercase tracking-wider leading-tight">{printRegionName}</h4>
+                          <h4 className="font-sans font-extrabold text-[8px] uppercase tracking-wider leading-none">
+                            {printGovernmentName}
+                          </h4>
+                          <h4 className="font-sans font-extrabold text-[9px] uppercase tracking-wider leading-tight">
+                            {printRegionName}
+                          </h4>
                         </div>
                       </div>
                       <h2 className="font-sans font-extrabold text-[10px] tracking-wide uppercase leading-tight">
                         {printTitle || "PETA SPASIAL KOTA"}
                       </h2>
                       <p className="text-[7px] font-mono leading-tight text-slate-700">
-                        {printSubtitle || "Badan Perencanaan Pembangunan Daerah"}
+                        {printSubtitle ||
+                          "Badan Perencanaan Pembangunan Daerah"}
                       </p>
                     </div>
 
                     {/* Col 2: Legend Panel */}
                     {printShowLegend ? (
                       <div className="flex-1 px-2 border-r border-slate-300 flex flex-col gap-1">
-                        <h5 className="font-bold text-[8px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">LEGENDA</h5>
+                        <h5 className="font-bold text-[8px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">
+                          LEGENDA
+                        </h5>
                         <div className="grid grid-cols-2 gap-x-2 gap-y-1 max-h-[70px] overflow-y-auto pr-1">
                           <div className="flex items-center gap-1 text-[8px]">
                             <div className="w-3 h-2 border border-black bg-emerald-500/10 shrink-0" />
-                            <span className="font-mono text-[7px] leading-tight truncate">Batas Kecamatan</span>
+                            <span className="font-mono text-[7px] leading-tight truncate">
+                              Batas Kecamatan
+                            </span>
                           </div>
                           <div className="flex items-center gap-1 text-[8px]">
                             <div className="w-3 h-0.5 bg-red-500 shrink-0" />
-                            <span className="font-mono text-[7px] leading-tight truncate">Jalan Kota</span>
+                            <span className="font-mono text-[7px] leading-tight truncate">
+                              Jalan Kota
+                            </span>
                           </div>
                           <div className="flex items-center gap-1 text-[8px]">
                             <div className="w-3 h-0.5 bg-blue-500 shrink-0" />
-                            <span className="font-mono text-[7px] leading-tight truncate">Aliran Sungai</span>
+                            <span className="font-mono text-[7px] leading-tight truncate">
+                              Aliran Sungai
+                            </span>
                           </div>
                           <div className="flex items-center gap-1 text-[8px]">
                             <div className="w-2 h-2 rounded-full bg-amber-500 border border-black shrink-0" />
-                            <span className="font-mono text-[7px] leading-tight truncate">Landmark Kota</span>
+                            <span className="font-mono text-[7px] leading-tight truncate">
+                              Landmark Kota
+                            </span>
                           </div>
 
-                          {layers.filter(l => l.visible).map((l) => (
-                            <div key={l.id} className="flex items-center gap-1 text-[8px]">
-                              {l.type === "fill" && (
-                                <div className="w-3 h-2 border border-black shrink-0" style={{ backgroundColor: l.color || "#94a3b8" }} />
-                              )}
-                              {l.type === "line" && (
-                                <div className="w-3 h-0.5 shrink-0" style={{ backgroundColor: l.color || "#ef4444" }} />
-                              )}
-                              {l.type === "circle" && (
-                                <div className="w-2 h-2 rounded-full border border-black shrink-0" style={{ backgroundColor: l.color || "#3b82f6" }} />
-                              )}
-                              <span className="font-mono text-[7px] truncate leading-tight capitalize shrink-0">{l.name}</span>
-                            </div>
-                          ))}
+                          {layers
+                            .filter((l) => l.visible)
+                            .map((l) => (
+                              <div
+                                key={l.id}
+                                className="flex items-center gap-1 text-[8px]"
+                              >
+                                {l.type === "fill" && (
+                                  <div
+                                    className="w-3 h-2 border border-black shrink-0"
+                                    style={{
+                                      backgroundColor: l.color || "#94a3b8",
+                                    }}
+                                  />
+                                )}
+                                {l.type === "line" && (
+                                  <div
+                                    className="w-3 h-0.5 shrink-0"
+                                    style={{
+                                      backgroundColor: l.color || "#ef4444",
+                                    }}
+                                  />
+                                )}
+                                {l.type === "circle" && (
+                                  <div
+                                    className="w-2 h-2 rounded-full border border-black shrink-0"
+                                    style={{
+                                      backgroundColor: l.color || "#3b82f6",
+                                    }}
+                                  />
+                                )}
+                                <span className="font-mono text-[7px] truncate leading-tight capitalize shrink-0">
+                                  {l.name}
+                                </span>
+                              </div>
+                            ))}
                         </div>
                       </div>
                     ) : (
@@ -4087,7 +4708,9 @@ export default function MapContainer({
                         {printShowCompass ? (
                           <div className="flex flex-col items-center justify-center">
                             <Compass className="w-7 h-7 text-black" />
-                            <span className="text-[6px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
+                            <span className="text-[6px] font-bold mt-0.5 font-mono">
+                              NORTH / UTARA
+                            </span>
                           </div>
                         ) : (
                           <div className="h-7" />
@@ -4105,15 +4728,21 @@ export default function MapContainer({
                               <span className="w-5 text-left">0</span>
                               <span className="w-5 text-center">1</span>
                               <span className="w-5 text-center">2</span>
-                              <span className="w-5 text-right">{printScaleBarKm}</span>
+                              <span className="w-5 text-right">
+                                {printScaleBarKm}
+                              </span>
                             </div>
-                            <span className="text-[6px] font-mono font-bold">{printScaleText || "1:25.000"}</span>
+                            <span className="text-[6px] font-mono font-bold">
+                              {printScaleText || "1:25.000"}
+                            </span>
                           </div>
                         )}
                       </div>
                       <div className="text-[7px] font-mono leading-snug text-slate-600 flex flex-col justify-center min-w-0">
                         <div className="truncate">Datum: {printDatum}</div>
-                        <div className="truncate">{printSourceText || "Sumber: Bappeda Banda Aceh"}</div>
+                        <div className="truncate">
+                          {printSourceText || "Sumber: Bappeda Banda Aceh"}
+                        </div>
                         <div className="truncate font-bold text-[6px] text-black border-t border-slate-200 mt-0.5 pt-0.5">
                           KTR: {printCartographer}
                         </div>
