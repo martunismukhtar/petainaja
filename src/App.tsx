@@ -451,6 +451,46 @@ export default function App() {
     );
   };
 
+  const handleUpdateFeatureProperties = (layerId: string, featureIndex: number, properties: Record<string, any>) => {
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id === layerId) {
+          const currentGeoJSON = l.geojson || { type: "FeatureCollection", features: [] };
+          const updatedFeatures = [...(currentGeoJSON.features || [])];
+          if (featureIndex >= 0 && featureIndex < updatedFeatures.length) {
+            updatedFeatures[featureIndex] = {
+              ...updatedFeatures[featureIndex],
+              properties: {
+                ...properties
+              }
+            };
+          }
+          return {
+            ...l,
+            geojson: {
+              ...currentGeoJSON,
+              features: updatedFeatures
+            }
+          };
+        }
+        return l;
+      })
+    );
+
+    // Sync clickedFeature properties so the UI stays up-to-date
+    setClickedFeature((prev) => {
+      if (prev && prev.layerId === layerId && prev.featureIndex === featureIndex) {
+        return {
+          ...prev,
+          properties: {
+            ...properties
+          }
+        };
+      }
+      return prev;
+    });
+  };
+
   const handleExportLayer = (id: LayerId | string, format: "shp" | "kml" | "geojson") => {
     // Get corresponding data
     let geojson: any = null;
@@ -878,6 +918,7 @@ export default function App() {
             onCreateWmsLayer={handleCreateWmsLayer}
             onRenameLayer={handleRenameLayer}
             onDeleteFeature={handleDeleteFeature}
+            onUpdateFeatureProperties={handleUpdateFeatureProperties}
           />
         )}
 

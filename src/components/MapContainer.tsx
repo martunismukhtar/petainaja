@@ -174,6 +174,16 @@ export default function MapContainer({
   const [printLogo, setPrintLogo] = useState<string | null>(null);
   const [printScaleText, setPrintScaleText] = useState("1:25.000");
   const [printSourceText, setPrintSourceText] = useState("Sumber: Badan Perencanaan Pembangunan Daerah Kota Banda Aceh");
+  const [printGovernmentName, setPrintGovernmentName] = useState("PEMERINTAH KOTA");
+  const [printRegionName, setPrintRegionName] = useState("BANDA ACEH");
+  const [printProvinceName, setPrintProvinceName] = useState("Provinsi Aceh, Indonesia");
+  const [printShowLegend, setPrintShowLegend] = useState(true);
+  const [printShowScale, setPrintShowScale] = useState(true);
+  const [printShowCompass, setPrintShowCompass] = useState(true);
+  const [printScaleBarKm, setPrintScaleBarKm] = useState("3 km");
+  const [printProjection, setPrintProjection] = useState("SISTEM PROYEKSI: UTM ZONE 46N");
+  const [printDatum, setPrintDatum] = useState("WGS 84 / UTM 46N");
+  const [printCartographer, setPrintCartographer] = useState("Bappeda Banda Aceh");
   const printLogoInputRef = useRef<HTMLInputElement>(null);
 
   // Dynamic layout print elements
@@ -2085,15 +2095,21 @@ export default function MapContainer({
       return;
     }
 
-    // Capture styles
+    // Capture styles (excluding @media print to avoid conflicts in the iframe)
     let stylesHtml = "";
     for (const styleSheet of Array.from(document.styleSheets)) {
       try {
         let rulesHtml = "";
         for (const rule of Array.from(styleSheet.cssRules)) {
+          // Skip @media print rules as they can conflict with our iframe print setup
+          if (rule.type === CSSRule.MEDIA_RULE && (rule as CSSMediaRule).media?.mediaText?.includes("print")) {
+            continue;
+          }
           rulesHtml += rule.cssText;
         }
-        stylesHtml += `<style>${rulesHtml}</style>`;
+        if (rulesHtml) {
+          stylesHtml += `<style>${rulesHtml}</style>`;
+        }
       } catch (e) {
         // Fallback for cross-origin sheets (like google fonts link, etc.)
         if (styleSheet.href) {
@@ -2102,7 +2118,7 @@ export default function MapContainer({
       }
     }
 
-    // Also copy direct link elements
+    // Also copy direct link elements (excluding any style elements with @media print)
     document.querySelectorAll("link[rel='stylesheet']").forEach((link) => {
       stylesHtml += link.outerHTML;
     });
@@ -2127,23 +2143,6 @@ export default function MapContainer({
             @page {
               size: ${printPaperSize === "A4" ? "A4" : "A3"} ${printOrientation};
               margin: 0;
-            }
-            @media print {
-              /* Override parent page styles that may be copied via stylesHtml */
-              body * {
-                visibility: visible !important;
-              }
-              html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                background: white !important;
-                color: black !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              .print\\:hidden {
-                display: none !important;
-              }
             }
             html, body {
               margin: 0 !important;
@@ -3168,6 +3167,165 @@ export default function MapContainer({
                     </button>
                   </div>
                 </div>
+
+                {/* Kop Instansi Detail */}
+                <div className="border-t border-[#334155]/60 pt-2.5">
+                  <span className="block text-[10px] text-sky-400 font-bold uppercase mb-2 font-mono">
+                    🏢 IDENTITAS KOP INSTANSI
+                  </span>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                        Teks Pemerintah
+                      </label>
+                      <input
+                        type="text"
+                        value={printGovernmentName}
+                        onChange={(e) => setPrintGovernmentName(e.target.value)}
+                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        placeholder="Contoh: PEMERINTAH KOTA"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                        Nama Wilayah / Daerah
+                      </label>
+                      <input
+                        type="text"
+                        value={printRegionName}
+                        onChange={(e) => setPrintRegionName(e.target.value)}
+                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        placeholder="Contoh: BANDA ACEH"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                        Keterangan Provinsi
+                      </label>
+                      <input
+                        type="text"
+                        value={printProvinceName}
+                        onChange={(e) => setPrintProvinceName(e.target.value)}
+                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        placeholder="Contoh: Provinsi Aceh, Indonesia"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                        Nama Kartografer (Pembuat)
+                      </label>
+                      <input
+                        type="text"
+                        value={printCartographer}
+                        onChange={(e) => setPrintCartographer(e.target.value)}
+                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        placeholder="Contoh: Bappeda Banda Aceh"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Proyeksi & Koordinat */}
+                <div className="border-t border-[#334155]/60 pt-2.5">
+                  <span className="block text-[10px] text-sky-400 font-bold uppercase mb-2 font-mono">
+                    🌐 PROYEKSI & DATUM KOORDINAT
+                  </span>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                        Sistem Proyeksi (Teks Overlay)
+                      </label>
+                      <input
+                        type="text"
+                        value={printProjection}
+                        onChange={(e) => setPrintProjection(e.target.value)}
+                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        placeholder="Contoh: SISTEM PROYEKSI: UTM ZONE 46N"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                        Sistem Rujukan / Datum
+                      </label>
+                      <input
+                        type="text"
+                        value={printDatum}
+                        onChange={(e) => setPrintDatum(e.target.value)}
+                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        placeholder="Contoh: WGS 84 / UTM 46N"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kontrol Tampilan Legenda, Kompas, & Skala */}
+                <div className="border-t border-[#334155]/60 pt-2.5">
+                  <span className="block text-[10px] text-sky-400 font-bold uppercase mb-2 font-mono">
+                    ⚙️ VISIBILITAS ELEMEN KOP
+                  </span>
+                  <div className="space-y-2.5 bg-slate-900/50 p-2.5 border border-[#334155]/30 rounded-lg">
+                    {/* Toggle Legenda */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-medium text-slate-300">Tampilkan Legenda</span>
+                      <button
+                        onClick={() => setPrintShowLegend(!printShowLegend)}
+                        className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
+                          printShowLegend
+                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                            : "bg-slate-800 text-slate-400 border-transparent hover:text-slate-300"
+                        }`}
+                      >
+                        {printShowLegend ? "AKTIF" : "Sembunyi"}
+                      </button>
+                    </div>
+
+                    {/* Toggle Kompas */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-medium text-slate-300">Tampilkan Arah Utara</span>
+                      <button
+                        onClick={() => setPrintShowCompass(!printShowCompass)}
+                        className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
+                          printShowCompass
+                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                            : "bg-slate-800 text-slate-400 border-transparent hover:text-slate-300"
+                        }`}
+                      >
+                        {printShowCompass ? "AKTIF" : "Sembunyi"}
+                      </button>
+                    </div>
+
+                    {/* Toggle Skala */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-medium text-slate-300">Tampilkan Skala Bar</span>
+                      <button
+                        onClick={() => setPrintShowScale(!printShowScale)}
+                        className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
+                          printShowScale
+                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                            : "bg-slate-800 text-slate-400 border-transparent hover:text-slate-300"
+                        }`}
+                      >
+                        {printShowScale ? "AKTIF" : "Sembunyi"}
+                      </button>
+                    </div>
+
+                    {/* Scale bar segment km input */}
+                    {printShowScale && (
+                      <div className="border-t border-[#334155]/40 pt-2 mt-1">
+                        <label className="block text-[9px] text-slate-400 font-mono uppercase mb-1">
+                          Nilai Batas Skala Bar
+                        </label>
+                        <input
+                          type="text"
+                          value={printScaleBarKm}
+                          onChange={(e) => setPrintScaleBarKm(e.target.value)}
+                          className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                          placeholder="Contoh: 3 km atau 500 m"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-3 overflow-y-auto max-h-[55vh] pr-1 scrollbar-thin">
@@ -3636,25 +3794,29 @@ export default function MapContainer({
                   )}
                   
                   {/* Grid or Scale ticks overlay inside map frame for decoration */}
-                  <div className="absolute top-2 left-2 bg-white/80 border border-black px-1.5 py-0.5 text-[8px] font-mono font-bold tracking-tight rounded pointer-events-none select-none text-black">
-                    SISTEM PROYEKSI: UTM ZONE 46N
-                  </div>
+                  {printProjection && (
+                    <div className="absolute top-2 left-2 bg-white/80 border border-black px-1.5 py-0.5 text-[8px] font-mono font-bold tracking-tight rounded pointer-events-none select-none text-black">
+                      {printProjection}
+                    </div>
+                  )}
                   {/* Scale Bar */}
-                  <div className="absolute bottom-2 left-2 bg-white/90 border border-black px-2 py-1 rounded pointer-events-none select-none text-black flex flex-col items-start gap-0.5">
-                    <div className="flex items-center gap-0">
-                      <div className="h-1.5 w-8 bg-black border-r border-black"></div>
-                      <div className="h-1.5 w-8 bg-white border-r border-black"></div>
-                      <div className="h-1.5 w-8 bg-black border-r border-black"></div>
-                      <div className="h-1.5 w-8 bg-white"></div>
+                  {printShowScale && (
+                    <div className="absolute bottom-2 left-2 bg-white/90 border border-black px-2 py-1 rounded pointer-events-none select-none text-black flex flex-col items-start gap-0.5">
+                      <div className="flex items-center gap-0">
+                        <div className="h-1.5 w-8 bg-black border-r border-black"></div>
+                        <div className="h-1.5 w-8 bg-white border-r border-black"></div>
+                        <div className="h-1.5 w-8 bg-black border-r border-black"></div>
+                        <div className="h-1.5 w-8 bg-white"></div>
+                      </div>
+                      <div className="flex items-center gap-0 w-full text-[6px] font-mono font-bold">
+                        <span className="w-8 text-left">0</span>
+                        <span className="w-8 text-center">1</span>
+                        <span className="w-8 text-center">2</span>
+                        <span className="w-8 text-right">{printScaleBarKm}</span>
+                      </div>
+                      <span className="text-[7px] font-mono font-bold mt-0.5">{printScaleText || "1:25.000"}</span>
                     </div>
-                    <div className="flex items-center gap-0 w-full text-[6px] font-mono font-bold">
-                      <span className="w-8 text-left">0</span>
-                      <span className="w-8 text-center">1</span>
-                      <span className="w-8 text-center">2</span>
-                      <span className="w-8 text-right">3 km</span>
-                    </div>
-                    <span className="text-[7px] font-mono font-bold mt-0.5">{printScaleText || "1:25.000"}</span>
-                  </div>
+                  )}
                   {/* Creator / Source text */}
                   <div className="absolute bottom-2 right-2 bg-white/80 border border-black px-2 py-1 text-[7px] font-mono font-bold rounded pointer-events-none select-none text-black max-w-[180px] text-right leading-tight">
                     {printSourceText || "Sumber: Bappeda Banda Aceh"}
@@ -3768,9 +3930,9 @@ export default function MapContainer({
                           </div>
                         )}
                         <div className="leading-tight">
-                          <h4 className="font-sans font-extrabold text-[9px] tracking-wider">PEMERINTAH KOTA</h4>
-                          <h4 className="font-sans font-extrabold text-[10px] tracking-wider uppercase">BANDA ACEH</h4>
-                          <p className="text-[7px] text-slate-600 font-medium font-mono leading-none mt-0.5">Provinsi Aceh, Indonesia</p>
+                          <h4 className="font-sans font-extrabold text-[9px] tracking-wider">{printGovernmentName}</h4>
+                          <h4 className="font-sans font-extrabold text-[10px] tracking-wider uppercase">{printRegionName}</h4>
+                          <p className="text-[7px] text-slate-600 font-medium font-mono leading-none mt-0.5">{printProvinceName}</p>
                         </div>
                       </div>
 
@@ -3785,60 +3947,64 @@ export default function MapContainer({
                       </div>
 
                       {/* Compass Block */}
-                      <div className="border-b-2 border-black pb-2.5 flex justify-center items-center gap-4 py-1">
-                        <div className="flex flex-col items-center">
-                          <Compass className="w-8 h-8 text-black" />
-                          <span className="text-[7px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
-                        </div>                        
-                      </div>
+                      {printShowCompass && (
+                        <div className="border-b-2 border-black pb-2.5 flex justify-center items-center gap-4 py-1">
+                          <div className="flex flex-col items-center">
+                            <Compass className="w-8 h-8 text-black" />
+                            <span className="text-[7px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
+                          </div>                        
+                        </div>
+                      )}
 
                       {/* Dynamic Legend Block */}
-                      <div className="flex flex-col gap-1.5">
-                        <h5 className="font-bold text-[9px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">LEGENDA PETA</h5>
-                        <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
-                          {/* Standard Layers */}
-                          <div className="flex items-center gap-2 text-[9px]">
-                            <div className="w-4 h-2.5 border border-black bg-emerald-500/10" />
-                            <span className="font-mono text-[8px] leading-tight">Batas Administrasi Kecamatan</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[9px]">
-                            <div className="w-4 h-0.5 bg-red-500" />
-                            <span className="font-mono text-[8px] leading-tight">Jaringan Jalan Utama</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[9px]">
-                            <div className="w-4 h-0.5 bg-blue-500" />
-                            <span className="font-mono text-[8px] leading-tight">Hidrologi Aliran Sungai</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[9px]">
-                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black" />
-                            <span className="font-mono text-[8px] leading-tight">Titik Landmark & Fasilitas</span>
-                          </div>
-
-                          {/* Dynamic Active Layers from Application */}
-                          {layers.filter(l => l.visible).map((l) => (
-                            <div key={l.id} className="flex items-center gap-2 text-[9px]">
-                              {l.type === "fill" && (
-                                <div className="w-4 h-2.5 border border-black" style={{ backgroundColor: l.color || "#94a3b8" }} />
-                              )}
-                              {l.type === "line" && (
-                                <div className="w-4 h-0.5" style={{ backgroundColor: l.color || "#ef4444" }} />
-                              )}
-                              {l.type === "circle" && (
-                                <div className="w-2.5 h-2.5 rounded-full border border-black" style={{ backgroundColor: l.color || "#3b82f6" }} />
-                              )}
-                              <span className="font-mono text-[8px] truncate leading-tight capitalize">{l.name}</span>
+                      {printShowLegend && (
+                        <div className="flex flex-col gap-1.5 border-b-2 border-black pb-2.5">
+                          <h5 className="font-bold text-[9px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">LEGENDA PETA</h5>
+                          <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
+                            {/* Standard Layers */}
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <div className="w-4 h-2.5 border border-black bg-emerald-500/10" />
+                              <span className="font-mono text-[8px] leading-tight">Batas Administrasi Kecamatan</span>
                             </div>
-                          ))}
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <div className="w-4 h-0.5 bg-red-500" />
+                              <span className="font-mono text-[8px] leading-tight">Jaringan Jalan Utama</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <div className="w-4 h-0.5 bg-blue-500" />
+                              <span className="font-mono text-[8px] leading-tight">Hidrologi Aliran Sungai</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black" />
+                              <span className="font-mono text-[8px] leading-tight">Titik Landmark & Fasilitas</span>
+                            </div>
+
+                            {/* Dynamic Active Layers from Application */}
+                            {layers.filter(l => l.visible).map((l) => (
+                              <div key={l.id} className="flex items-center gap-2 text-[9px]">
+                                {l.type === "fill" && (
+                                  <div className="w-4 h-2.5 border border-black" style={{ backgroundColor: l.color || "#94a3b8" }} />
+                                )}
+                                {l.type === "line" && (
+                                  <div className="w-4 h-0.5" style={{ backgroundColor: l.color || "#ef4444" }} />
+                                )}
+                                {l.type === "circle" && (
+                                  <div className="w-2.5 h-2.5 rounded-full border border-black" style={{ backgroundColor: l.color || "#3b82f6" }} />
+                                )}
+                                <span className="font-mono text-[8px] truncate leading-tight capitalize">{l.name}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Footer metadata block */}
                     <div className="border-t-2 border-black pt-2 text-[7px] font-mono text-slate-500 flex flex-col gap-0.5">
-                      <div>{printSourceText || "Sumber: Bappeda Banda Aceh"}</div>
-                      <div>Skala: {printScaleText || "1:25.000"}</div>
-                      <div>Tanggal Cetak: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-                      <div className="font-bold text-[6px] tracking-wider uppercase border-t border-slate-200 mt-1 pt-0.5">KARTOGRAFER INDONESIA</div>
+                      <div className="truncate">{printSourceText || "Sumber: Bappeda Banda Aceh"}</div>
+                      {printShowScale && <div className="truncate">Skala: {printScaleText || "1:25.000"}</div>}
+                      <div className="truncate">Tanggal Cetak: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                      <div className="font-bold text-[6px] tracking-wider uppercase border-t border-slate-200 mt-1 pt-0.5 truncate">KARTOGRAFER: {printCartographer}</div>
                     </div>
                   </div>
                 ) : (
@@ -3859,8 +4025,8 @@ export default function MapContainer({
                           </div>
                         )}
                         <div className="leading-tight">
-                          <h4 className="font-sans font-extrabold text-[8px] uppercase tracking-wider leading-none">PEMERINTAH KOTA</h4>
-                          <h4 className="font-sans font-extrabold text-[9px] uppercase tracking-wider leading-tight">BANDA ACEH</h4>
+                          <h4 className="font-sans font-extrabold text-[8px] uppercase tracking-wider leading-none">{printGovernmentName}</h4>
+                          <h4 className="font-sans font-extrabold text-[9px] uppercase tracking-wider leading-tight">{printRegionName}</h4>
                         </div>
                       </div>
                       <h2 className="font-sans font-extrabold text-[10px] tracking-wide uppercase leading-tight">
@@ -3872,70 +4038,84 @@ export default function MapContainer({
                     </div>
 
                     {/* Col 2: Legend Panel */}
-                    <div className="flex-1 px-2 border-r border-slate-300 flex flex-col gap-1">
-                      <h5 className="font-bold text-[8px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">LEGENDA</h5>
-                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 max-h-[70px] overflow-y-auto pr-1">
-                        <div className="flex items-center gap-1 text-[8px]">
-                          <div className="w-3 h-2 border border-black bg-emerald-500/10 shrink-0" />
-                          <span className="font-mono text-[7px] leading-tight truncate">Batas Kecamatan</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[8px]">
-                          <div className="w-3 h-0.5 bg-red-500 shrink-0" />
-                          <span className="font-mono text-[7px] leading-tight truncate">Jalan Kota</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[8px]">
-                          <div className="w-3 h-0.5 bg-blue-500 shrink-0" />
-                          <span className="font-mono text-[7px] leading-tight truncate">Aliran Sungai</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[8px]">
-                          <div className="w-2 h-2 rounded-full bg-amber-500 border border-black shrink-0" />
-                          <span className="font-mono text-[7px] leading-tight truncate">Landmark Kota</span>
-                        </div>
-
-                        {layers.filter(l => l.visible).map((l) => (
-                          <div key={l.id} className="flex items-center gap-1 text-[8px]">
-                            {l.type === "fill" && (
-                              <div className="w-3 h-2 border border-black shrink-0" style={{ backgroundColor: l.color || "#94a3b8" }} />
-                            )}
-                            {l.type === "line" && (
-                              <div className="w-3 h-0.5 shrink-0" style={{ backgroundColor: l.color || "#ef4444" }} />
-                            )}
-                            {l.type === "circle" && (
-                              <div className="w-2 h-2 rounded-full border border-black shrink-0" style={{ backgroundColor: l.color || "#3b82f6" }} />
-                            )}
-                            <span className="font-mono text-[7px] truncate leading-tight capitalize shrink-0">{l.name}</span>
+                    {printShowLegend ? (
+                      <div className="flex-1 px-2 border-r border-slate-300 flex flex-col gap-1">
+                        <h5 className="font-bold text-[8px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">LEGENDA</h5>
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 max-h-[70px] overflow-y-auto pr-1">
+                          <div className="flex items-center gap-1 text-[8px]">
+                            <div className="w-3 h-2 border border-black bg-emerald-500/10 shrink-0" />
+                            <span className="font-mono text-[7px] leading-tight truncate">Batas Kecamatan</span>
                           </div>
-                        ))}
+                          <div className="flex items-center gap-1 text-[8px]">
+                            <div className="w-3 h-0.5 bg-red-500 shrink-0" />
+                            <span className="font-mono text-[7px] leading-tight truncate">Jalan Kota</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[8px]">
+                            <div className="w-3 h-0.5 bg-blue-500 shrink-0" />
+                            <span className="font-mono text-[7px] leading-tight truncate">Aliran Sungai</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[8px]">
+                            <div className="w-2 h-2 rounded-full bg-amber-500 border border-black shrink-0" />
+                            <span className="font-mono text-[7px] leading-tight truncate">Landmark Kota</span>
+                          </div>
+
+                          {layers.filter(l => l.visible).map((l) => (
+                            <div key={l.id} className="flex items-center gap-1 text-[8px]">
+                              {l.type === "fill" && (
+                                <div className="w-3 h-2 border border-black shrink-0" style={{ backgroundColor: l.color || "#94a3b8" }} />
+                              )}
+                              {l.type === "line" && (
+                                <div className="w-3 h-0.5 shrink-0" style={{ backgroundColor: l.color || "#ef4444" }} />
+                              )}
+                              {l.type === "circle" && (
+                                <div className="w-2 h-2 rounded-full border border-black shrink-0" style={{ backgroundColor: l.color || "#3b82f6" }} />
+                              )}
+                              <span className="font-mono text-[7px] truncate leading-tight capitalize shrink-0">{l.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex-1 px-2 border-r border-slate-300 flex flex-col justify-center items-center text-slate-400 font-mono text-[8px]">
+                        Legenda Dinonaktifkan
+                      </div>
+                    )}
 
                     {/* Col 3: Compass, Scale, Metadata */}
                     <div className="flex-1 pl-2 flex flex-row items-center justify-between gap-2">
                       <div className="flex flex-col items-center justify-center shrink-0">
-                        <Compass className="w-7 h-7 text-black" />
-                        <span className="text-[6px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
+                        {printShowCompass ? (
+                          <div className="flex flex-col items-center justify-center">
+                            <Compass className="w-7 h-7 text-black" />
+                            <span className="text-[6px] font-bold mt-0.5 font-mono">NORTH / UTARA</span>
+                          </div>
+                        ) : (
+                          <div className="h-7" />
+                        )}
                         {/* Scale bar mini */}
-                        <div className="mt-1 flex flex-col items-center">
-                          <div className="flex items-center gap-0">
-                            <div className="h-1 w-5 bg-black border-r border-black"></div>
-                            <div className="h-1 w-5 bg-white border-r border-black"></div>
-                            <div className="h-1 w-5 bg-black border-r border-black"></div>
-                            <div className="h-1 w-5 bg-white"></div>
+                        {printShowScale && (
+                          <div className="mt-1 flex flex-col items-center">
+                            <div className="flex items-center gap-0">
+                              <div className="h-1 w-5 bg-black border-r border-black"></div>
+                              <div className="h-1 w-5 bg-white border-r border-black"></div>
+                              <div className="h-1 w-5 bg-black border-r border-black"></div>
+                              <div className="h-1 w-5 bg-white"></div>
+                            </div>
+                            <div className="flex items-center gap-0 w-full text-[5px] font-mono font-bold">
+                              <span className="w-5 text-left">0</span>
+                              <span className="w-5 text-center">1</span>
+                              <span className="w-5 text-center">2</span>
+                              <span className="w-5 text-right">{printScaleBarKm}</span>
+                            </div>
+                            <span className="text-[6px] font-mono font-bold">{printScaleText || "1:25.000"}</span>
                           </div>
-                          <div className="flex items-center gap-0 w-full text-[5px] font-mono font-bold">
-                            <span className="w-5 text-left">0</span>
-                            <span className="w-5 text-center">1</span>
-                            <span className="w-5 text-center">2</span>
-                            <span className="w-5 text-right">3km</span>
-                          </div>
-                          <span className="text-[6px] font-mono font-bold">{printScaleText || "1:25.000"}</span>
-                        </div>
+                        )}
                       </div>
                       <div className="text-[7px] font-mono leading-snug text-slate-600 flex flex-col justify-center min-w-0">
-                        <div className="truncate">Datum: WGS 84 / UTM 46N</div>
+                        <div className="truncate">Datum: {printDatum}</div>
                         <div className="truncate">{printSourceText || "Sumber: Bappeda Banda Aceh"}</div>
                         <div className="truncate font-bold text-[6px] text-black border-t border-slate-200 mt-0.5 pt-0.5">
-                          TGL: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          KTR: {printCartographer}
                         </div>
                       </div>
                     </div>
