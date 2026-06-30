@@ -11,8 +11,7 @@ import Footer from "./components/Footer";
 import { LayerId } from "./types";
 import type {
   GisLayer,
-  ClickedFeatureInfo,
-  CustomPin,
+  ClickedFeatureInfo,  
   BasemapId,
   GisTool,
   EditingFeature
@@ -41,73 +40,21 @@ import {
 import { validateAndParseShapefileZip } from "./utils/shapefileParser";
 
 const INITIAL_LAYERS: GisLayer[] = [
-  {
-    id: LayerId.KABUPATEN,
-    name: "Kabupaten / Kecamatan",
-    visible: true,
-    type: "fill",
-    color: "#3b82f6",
-    outlineColor: "#1d4ed8",
-    opacity: 0.25,
-    description: "Batas administrasi kecamatan di Banda Aceh",
-    count: 5,
-    iconStyle: "circle",
-    lineStyle: "dashed"
-  },
-  {
-    id: LayerId.JALAN,
-    name: "Infrastruktur Jalan",
-    visible: true,
-    type: "line",
-    color: "#f59e0b",
-    opacity: 0.95,
-    description: "Jalan arteri dan jalan protokol utama",
-    count: 4,
-    lineStyle: "solid",
-    lineWidth: 3
-  },
-  {
-    id: LayerId.SUNGAI,
-    name: "Hidrologi Sungai",
-    visible: false,
-    type: "line",
-    color: "#06b6d4",
-    opacity: 0.8,
-    description: "Aliran sungai Krueng Aceh & Krueng Daroy",
-    count: 2,
-    lineStyle: "solid",
-    lineWidth: 4
-  },
-  {
-    id: LayerId.LANDMARK,
-    name: "Landmarks (Titik Penting)",
-    visible: true,
-    type: "circle",
-    color: "#10b981",
-    opacity: 1.0,
-    description: "Masjid Raya, Museum, dan fasilitas bersejarah",
-    count: 4,
-    iconStyle: "marker"
-  }
+  
 ];
 
 export default function App() {
   // --- CORE STATE ---
   const [layers, setLayers] = useState<GisLayer[]>(() => {
     return INITIAL_LAYERS.map(layer => {
-      let geojson: any = null;
-      if (layer.id === LayerId.KABUPATEN) geojson = JSON.parse(JSON.stringify(KABUPATEN_DATA));
-      else if (layer.id === LayerId.JALAN) geojson = JSON.parse(JSON.stringify(JALAN_DATA));
-      else if (layer.id === LayerId.SUNGAI) geojson = JSON.parse(JSON.stringify(SUNGAI_DATA));
-      else if (layer.id === LayerId.LANDMARK) geojson = JSON.parse(JSON.stringify(LANDMARK_DATA));
+      let geojson: any = null;      
       return { ...layer, geojson };
     });
   });
   const [editingFeature, setEditingFeature] = useState<EditingFeature | null>(null);
   const [activeBasemap, setActiveBasemap] = useState<BasemapId>("voyager");
   const [activeTool, setActiveTool] = useState<GisTool>("none");
-  const [clickedFeature, setClickedFeature] = useState<ClickedFeatureInfo | null>(null);
-  const [customPins, setCustomPins] = useState<CustomPin[]>([]);
+  const [clickedFeature, setClickedFeature] = useState<ClickedFeatureInfo | null>(null);  
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(window.innerWidth >= 768);
 
   // Auto-hide sidebar on mobile screens on mount and handle resize
@@ -554,13 +501,12 @@ export default function App() {
   };
 
   // Reset view to default Banda Aceh Center
-  const handleResetView = () => {
-    setFlyToCoords([95.319, 5.551]);
-  };
+  // const handleResetView = () => {
+  //   setFlyToCoords([95.319, 5.551]);
+  // };
 
   // Reset custom user-added content
-  const handleClearDrawings = () => {
-    setCustomPins([]);
+  const handleClearDrawings = () => {    
     setClickedFeature(null);
     setLayers((prev) =>
       prev.map((layer) =>
@@ -568,20 +514,6 @@ export default function App() {
       )
     );
     alert("Semua Pin Kustom dan hasil pengukuran telah dibersihkan.");
-  };
-
-  // Fly to location
-  const handleZoomToPin = (coordinates: [number, number]) => {
-    setFlyToCoords(coordinates);
-  };
-
-  // Add custom pin to database list
-  const handleAddCustomPin = (pin: CustomPin) => {
-    setCustomPins((prev) => [pin, ...prev]);
-  };
-
-  const handleDeleteCustomPin = (id: string) => {
-    setCustomPins((prev) => prev.filter((pin) => pin.id !== id));
   };
 
   // Pointer coordination tracking from map
@@ -652,7 +584,7 @@ export default function App() {
           if (firstFeature) {
             const coords = getFeatureCenter(firstFeature);
             if (coords) {
-              handleZoomToPin(coords);
+              
             }
           }
         } else {
@@ -711,7 +643,7 @@ export default function App() {
             if (firstFeature) {
               const coords = getFeatureCenter(firstFeature);
               if (coords) {
-                handleZoomToPin(coords);
+                
               }
             }
           } else {
@@ -749,8 +681,7 @@ export default function App() {
         count += geojson.features?.length || 0;
       });
     }
-
-    count += customPins.length;
+    
     return count;
   };
 
@@ -872,11 +803,11 @@ export default function App() {
         onChangeBasemap={handleChangeBasemap}
         activeTool={activeTool}
         onChangeTool={handleChangeTool}
-        onResetView={handleResetView}
+        
         onClearDrawings={handleClearDrawings}
         onTriggerFileUpload={handleTriggerFileUpload}
         onShowStats={() => setShowStatsModal(true)}
-        totalCustomPoints={customPins.length}
+        
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
       />
@@ -889,10 +820,7 @@ export default function App() {
             layers={layers}
             onToggleLayer={handleToggleLayer}
             clickedFeature={clickedFeature}
-            onCloseFeatureInfo={() => setClickedFeature(null)}
-            customPins={customPins}
-            onDeleteCustomPin={handleDeleteCustomPin}
-            onZoomToPin={handleZoomToPin}
+            onCloseFeatureInfo={() => setClickedFeature(null)}                        
             uploadedGeoJSONsCount={uploadedGeoJSONs.length}
             isUploadedVisible={isUploadedVisible}
             onToggleUploadedVisibility={() => setIsUploadedVisible(!isUploadedVisible)}
@@ -924,9 +852,7 @@ export default function App() {
           activeTool={activeTool}
           onChangeTool={handleChangeTool}
           clickedFeature={clickedFeature}
-          onFeatureClick={setClickedFeature}
-          customPins={customPins}
-          onAddCustomPin={handleAddCustomPin}
+          onFeatureClick={setClickedFeature}          
           onUpdatePointer={handleUpdatePointer}
           onUpdateZoom={handleUpdateZoom}
           isMapLoaded={isMapLoaded}
@@ -1227,8 +1153,7 @@ export default function App() {
                                     if (!coords) return <span className="text-slate-500 font-mono text-[10px]">No Geo</span>;
                                     return (
                                       <button
-                                        onClick={() => {
-                                          handleZoomToPin(coords);
+                                        onClick={() => {                                          
                                           setClickedFeature({
                                             layerId: attributeTableLayerId,
                                             layerName: activeLayerName,

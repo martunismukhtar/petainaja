@@ -5,6 +5,7 @@ import { LayerId } from "../types";
 import type {
   GisLayer,
   ClickedFeatureInfo,
+  CustomPin,
   BasemapId,
   GisTool,
 } from "../types";
@@ -13,7 +14,7 @@ import {
   KABUPATEN_DATA,
   JALAN_DATA,
   SUNGAI_DATA,
-  // LANDMARK_DATA,
+  LANDMARK_DATA,
 } from "../data/geojson";
 import {
   calculateHaversineDistance,
@@ -24,10 +25,12 @@ import {
   Radio,
   MapPin,
   Trash2,
-  // Navigation,
-  // Plus,
-  // Minus,
-  Printer,  
+  Navigation,
+  Plus,
+  Minus,
+  Printer,
+  Download,
+  Compass,
   X,
   Type,
   Square,
@@ -58,7 +61,7 @@ const CLASSIC_NORTH_ARROW =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 5 L75 80 L50 65 L25 80 Z' fill='black'/><path d='M50 5 L50 65 L25 80 Z' fill='%23ccc'/><text x='50' y='98' font-family='sans-serif' font-size='18' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
 
 const MODERN_NORTH_ARROW =
-  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' stroke='black' Width='2' fill='none'/><path d='M50 15 L58 50 L50 45 L42 50 Z' fill='black'/><path d='M50 85 L58 50 L50 55 L42 50 Z' fill='%23777'/><text x='50' y='12' font-family='sans-serif' font-size='14' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' stroke='black' stroke-width='2' fill='none'/><path d='M50 15 L58 50 L50 45 L42 50 Z' fill='black'/><path d='M50 85 L58 50 L50 55 L42 50 Z' fill='%23777'/><text x='50' y='12' font-family='sans-serif' font-size='14' font-weight='bold' text-anchor='middle' fill='black'>U</text></svg>";
 
 // Basemap JSON Style URL Map
 const BASEMAP_STYLES: Record<BasemapId, string> = {
@@ -75,6 +78,8 @@ interface MapContainerProps {
   onChangeTool: (tool: GisTool) => void;
   clickedFeature: ClickedFeatureInfo | null;
   onFeatureClick: (info: ClickedFeatureInfo | null) => void;
+  customPins: CustomPin[];
+  onAddCustomPin: (pin: CustomPin) => void;
   onUpdatePointer: (lon: number, lat: number) => void;
   onUpdateZoom: (zoom: number) => void;
   isMapLoaded: boolean;
@@ -129,6 +134,8 @@ export default function MapContainer({
   onChangeTool,
   // clickedFeature,
   onFeatureClick,
+  customPins,
+  onAddCustomPin,
   onUpdatePointer,
   onUpdateZoom,
   isMapLoaded,
@@ -150,6 +157,7 @@ export default function MapContainer({
 
   // Markers arrays to clean up on updates
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const customPinMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   // GIS Tool States
   const [measurePoints, setMeasurePoints] = useState<[number, number][]>([]);
@@ -201,6 +209,7 @@ export default function MapContainer({
     "Provinsi Aceh, Indonesia",
   );
   const [printShowLegend, setPrintShowLegend] = useState(true);
+  const [printShowScale, setPrintShowScale] = useState(true);
   const [printShowCompass, setPrintShowCompass] = useState(true);
   const [printScaleBarKm, setPrintScaleBarKm] = useState("3 km");
   const [printProjection, setPrintProjection] = useState(
@@ -545,6 +554,7 @@ export default function MapContainer({
     mapRef.current.once("idle", () => {
       setIsMapLoaded(true);
       renderLandmarkMarkers();
+      renderCustomPinMarkers();
     });
   }, [activeBasemap]);
 
@@ -1276,7 +1286,8 @@ export default function MapContainer({
     const layerOpacity = landmarkLayer?.opacity ?? 1.0;
     const iconStyle = landmarkLayer?.iconStyle || "marker";
 
-    const featuresSource = landmarkLayer?.geojson?.features || [];
+    const featuresSource =
+      landmarkLayer?.geojson?.features || LANDMARK_DATA.features;
 
     featuresSource.forEach((feature: any, idx: number) => {
       const coords = feature.geometry.coordinates as [number, number];
@@ -1301,7 +1312,7 @@ export default function MapContainer({
           "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
         innerHTML = `
           <svg class="w-8 h-8 filter drop-shadow-md" viewBox="0 0 24 24" fill="${layerColor}">
-            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" stroke="white" strokeWidth="1.5"/>
+            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" stroke="white" stroke-width="1.5"/>
           </svg>
         `;
       } else if (iconStyle === "triangle") {
@@ -1309,7 +1320,7 @@ export default function MapContainer({
           "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
         innerHTML = `
           <svg class="w-8 h-8 filter drop-shadow-md" viewBox="0 0 24 24" fill="${layerColor}">
-            <polygon points="12,2 22,22 2,22" stroke="white" strokeWidth="2"/>
+            <polygon points="12,2 22,22 2,22" stroke="white" stroke-width="2"/>
           </svg>
         `;
       } else {
@@ -1318,7 +1329,7 @@ export default function MapContainer({
           "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform duration-150 relative group";
         innerHTML = `
           <svg class="w-8 h-8 filter drop-shadow-md" viewBox="0 0 24 24" fill="${layerColor}">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" stroke="white" strokeWidth="1.5"/>
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" stroke="white" stroke-width="1.5"/>
           </svg>
         `;
       }
@@ -1360,11 +1371,68 @@ export default function MapContainer({
     });
   };
 
+  // --- 6. RENDER CUSTOM USER PIN MARKERS ---
+  const renderCustomPinMarkers = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    customPinMarkersRef.current.forEach((m) => m.remove());
+    customPinMarkersRef.current = [];
+
+    customPins.forEach((pin) => {
+      const el = document.createElement("div");
+      el.className =
+        "w-8 h-8 flex items-center justify-center cursor-pointer transform hover:scale-115 transition-transform relative group";
+
+      // Marker Icon (Red pin teardrop styled)
+      el.innerHTML = `
+        <svg class="w-7 h-7 text-red-500 filter drop-shadow-md" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      `;
+
+      // Hover Tooltip
+      const label = document.createElement("div");
+      label.className =
+        "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1.5 bg-slate-950 text-red-400 font-sans text-[10px] font-bold py-1 px-2 rounded border border-red-900/40 shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50";
+      label.textContent = pin.name;
+      el.appendChild(label);
+
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onFeatureClick({
+          layerName: `Pin Kustom (${pin.category})`,
+          properties: {
+            name: pin.name,
+            kategori: pin.category,
+            deskripsi: pin.description,
+            latitude: pin.coordinates[1],
+            longitude: pin.coordinates[0],
+          },
+          coordinates: pin.coordinates,
+        });
+        map.flyTo({ center: pin.coordinates, zoom: 15, duration: 1000 });
+      });
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat(pin.coordinates)
+        .addTo(map);
+
+      customPinMarkersRef.current.push(marker);
+    });
+  };
+
   useEffect(() => {
     if (isMapLoaded) {
       renderLandmarkMarkers();
     }
   }, [layers, isMapLoaded]);
+
+  useEffect(() => {
+    if (isMapLoaded) {
+      renderCustomPinMarkers();
+    }
+  }, [customPins, isMapLoaded]);
 
   // --- 7. EXTERNAL UPLOADED GEOJSON DRAWING ---
   useEffect(() => {
@@ -1454,71 +1522,71 @@ export default function MapContainer({
   // --- 8. WEBGL SOURCES & LAYERS SETUP (MAIN MAP) ---
   const addGisSourcesAndLayers = (map: maplibregl.Map) => {
     // 1. Kabupaten Sub-districts Fill & Border
-    if (!map.getSource("kabupaten-source")) {
-      map.addSource("kabupaten-source", {
-        type: "geojson",
-        data: KABUPATEN_DATA,
-      });
+    // if (!map.getSource("kabupaten-source")) {
+    //   map.addSource("kabupaten-source", {
+    //     type: "geojson",
+    //     data: KABUPATEN_DATA,
+    //   });
 
-      map.addLayer({
-        id: "kabupaten-layer",
-        type: "fill",
-        source: "kabupaten-source",
-        paint: {
-          "fill-color": ["get", "color"],
-          "fill-opacity": 0.22,
-        },
-      });
+    //   map.addLayer({
+    //     id: "kabupaten-layer",
+    //     type: "fill",
+    //     source: "kabupaten-source",
+    //     paint: {
+    //       "fill-color": ["get", "color"],
+    //       "fill-opacity": 0.22,
+    //     },
+    //   });
 
-      map.addLayer({
-        id: "kabupaten-outline",
-        type: "line",
-        source: "kabupaten-source",
-        paint: {
-          "line-color": ["get", "color"],
-          "line-width": 1.5,
-          "line-dasharray": [3, 2],
-        },
-      });
-    }
+    //   map.addLayer({
+    //     id: "kabupaten-outline",
+    //     type: "line",
+    //     source: "kabupaten-source",
+    //     paint: {
+    //       "line-color": ["get", "color"],
+    //       "line-width": 1.5,
+    //       "line-dasharray": [3, 2],
+    //     },
+    //   });
+    // }
 
     // 2. Roads
-    if (!map.getSource("jalan-source")) {
-      map.addSource("jalan-source", {
-        type: "geojson",
-        data: JALAN_DATA,
-      });
+    // if (!map.getSource("jalan-source")) {
+    //   map.addSource("jalan-source", {
+    //     type: "geojson",
+    //     data: JALAN_DATA,
+    //   });
 
-      map.addLayer({
-        id: "jalan-layer",
-        type: "line",
-        source: "jalan-source",
-        paint: {
-          "line-color": "#f59e0b",
-          "line-width": 3,
-          "line-opacity": 0.95,
-        },
-      });
-    }
+    //   map.addLayer({
+    //     id: "jalan-layer",
+    //     type: "line",
+    //     source: "jalan-source",
+    //     paint: {
+    //       "line-color": "#f59e0b",
+    //       "line-width": 3,
+    //       "line-opacity": 0.95,
+    //     },
+    //   });
+    // }
 
     // 3. Rivers
-    if (!map.getSource("sungai-source")) {
-      map.addSource("sungai-source", {
-        type: "geojson",
-        data: SUNGAI_DATA,
-      });
+    // if (!map.getSource("sungai-source")) {
+    //   map.addSource("sungai-source", {
+    //     type: "geojson",
+    //     data: SUNGAI_DATA,
+    //   });
 
-      map.addLayer({
-        id: "sungai-layer",
-        type: "line",
-        source: "sungai-source",
-        paint: {
-          "line-color": "#06b6d4",
-          "line-width": 4.5,
-          "line-opacity": 0.8,
-        },
-      });
-    }
+    //   map.addLayer({
+    //     id: "sungai-layer",
+    //     type: "line",
+    //     source: "sungai-source",
+    //     paint: {
+    //       "line-color": "#06b6d4",
+    //       "line-width": 4.5,
+    //       "line-opacity": 0.8,
+    //     },
+    //   });
+    // }
 
     // 4. Spatial Measurement Layer
     if (!map.getSource("measure-line-source")) {
@@ -1686,6 +1754,7 @@ export default function MapContainer({
 
     // Trigger Initial Markers rendering after WebGL is armed
     renderLandmarkMarkers();
+    renderCustomPinMarkers();
 
     // Prevent map dragging when the mouse is over active drawing vector layers on the map
     // NOTE: editing-highlight-* layers are excluded to avoid interfering with vertex marker dragging
@@ -2089,6 +2158,23 @@ export default function MapContainer({
   }, [activeTool]);
 
   // Submit custom pin
+  const handleSavePin = () => {
+    if (!newPinName || !pinDialogCoords) return;
+
+    onAddCustomPin({
+      id: `pin_${Date.now()}`,
+      name: newPinName,
+      category: newPinCategory,
+      coordinates: pinDialogCoords,
+      description: newPinDesc || "Tidak ada deskripsi tambahan",
+    });
+
+    // Reset fields & close dialog
+    setNewPinName("");
+    setNewPinCategory("Fasilitas");
+    setNewPinDesc("");
+    setPinDialogCoords(null);
+  };
 
   // Capture map and open print/export dialog
   const handleCaptureMap = () => {
@@ -2162,6 +2248,15 @@ export default function MapContainer({
       setCapturedMapUrl(null);
       setIsCapturing(false);
     }
+  };
+
+  // Download raw captured map image as PNG
+  const handleDownloadMapPNG = () => {
+    if (!capturedMapUrl) return;
+    const link = document.createElement("a");
+    link.download = `peta_banda_aceh_${new Date().toISOString().slice(0, 10)}.png`;
+    link.href = capturedMapUrl;
+    link.click();
   };
 
   // High-fidelity local print handler via temporary hidden iframe
@@ -2416,114 +2511,41 @@ export default function MapContainer({
           title="Cetak dan Ekspor Tata Letak Peta (Kop Kartografi)"
         >
           <Printer className="w-4 h-4 text-[#38bdf8]" />
+          <span className="font-bold text-[11px]">CETAK PETA</span>
         </button>
 
         <button
           onClick={handleToggle3D}
-          className={`cursor-pointer p-2.5 rounded-lg border shadow-lg font-sans text-xs flex items-center justify-center gap-1.5 transition-all ${
+          className={`p-2.5 rounded-lg border shadow-lg font-sans text-xs flex items-center justify-center gap-1.5 transition-all ${
             is3DMode
-              ? "bg-[#434955] border-[#38bdf8] text-slate-950 font-bold"
+              ? "bg-[#38bdf8] border-[#38bdf8] text-slate-950 font-bold"
               : "bg-[#0f172a] border-[#334155] text-slate-300 hover:bg-[#1e293b] hover:text-white"
           }`}
           title="Ganti Sudut Pandang 3D"
         >
-          <svg
-            fill="#38bdf8"
-            version="1.1"
-            id="Capa_1"
-            xmlns="http://www.w3.org/2000/svg"
-            width="24px"
-            height="24px"
-            viewBox="0 0 51.463 51.463"
-          >
-            <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-            <g
-              id="SVGRepo_tracerCarrier"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            ></g>
-            <g id="SVGRepo_iconCarrier">
-              {" "}
-              <g>
-                {" "}
-                <g>
-                  {" "}
-                  <path d="M24.832,22.621V33.15c0.903,0.114,2.122,0.204,3.747,0.204c2.96,0,5.373-0.7,6.889-2.079 c1.448-1.311,2.372-3.343,2.372-6.051c0-2.598-0.905-4.407-2.372-5.603c-1.398-1.175-3.363-1.764-6.209-1.764l-4.427,0.038v2.167 l4.672-0.034c3.479,0,5.422,1.919,5.397,5.284c0,3.864-2.145,5.85-5.756,5.828c-0.566,0-1.15,0-1.537-0.067v-8.453H24.832z"></path>{" "}
-                  <path d="M18.118,31.155c-1.451,0-2.874-0.584-3.459-0.936l-0.654,2.175c0.819,0.536,2.408,1.048,4.254,1.048 c3.76,0,5.909-2.029,5.909-4.601c0-2.056-1.494-3.458-3.34-3.784v-0.047c1.867-0.657,2.801-1.962,2.801-3.553 c0-1.987-1.61-3.715-4.741-3.715c-1.822,0-3.506,0.562-4.369,1.17l0.655,2.078c0.63-0.421,1.867-0.96,3.104-0.96 c1.66,0,2.435,0.866,2.435,1.896c0,1.519-1.681,2.126-3.016,2.126h-1.283v2.104h1.332c1.748,0,3.429,0.771,3.429,2.568 C21.204,29.918,20.313,31.155,18.118,31.155z"></path>{" "}
-                  <path d="M8.832,11.011l8.335,2.675c0.059,0.084,0.153,0.137,0.256,0.137c0.032,0,0.065-0.005,0.098-0.017l0.011-0.003l7.917,2.541 c0.03,0.01,0.063,0.015,0.095,0.015c0.031,0,0.063-0.005,0.094-0.015l7.6-2.438c0.007,0,0.013,0.003,0.02,0.003 c0.071,0,0.141-0.026,0.194-0.071L50.16,8.475c0.129-0.041,0.216-0.161,0.216-0.295c0-0.135-0.087-0.255-0.216-0.296L25.636,0.015 c-0.061-0.02-0.127-0.02-0.188,0L0.926,7.883C0.798,7.924,0.71,8.044,0.71,8.179s0.088,0.254,0.216,0.295L8.832,11.011 C8.831,11.011,8.831,11.011,8.832,11.011z M17.527,13.149l-7.605-2.44l7.012-2.352l7.378,2.518L17.527,13.149z M17.903,8.032 l7.534-2.525l7.462,2.488l-7.619,2.555L17.903,8.032z M25.543,15.722l-7.018-2.252l6.755-2.264l6.95,2.371L25.543,15.722z M33.22,13.258l-6.971-2.378l7.631-2.559l7.221,2.407L33.22,13.258z M41.513,5.761l7.534,2.418l-6.978,2.239 c-0.025-0.02-0.053-0.038-0.084-0.048l-7.127-2.376l6.646-2.229C41.507,5.765,41.51,5.762,41.513,5.761z M40.517,5.441 l-6.638,2.226l-7.463-2.488l6.496-2.178L40.517,5.441z M25.543,0.636l6.371,2.044l-6.478,2.172l-6.391-2.131L25.543,0.636z M18.053,3.039c0.009,0.004,0.017,0.012,0.026,0.016l6.378,2.126l-7.523,2.522l-6.501-2.219L18.053,3.039z M9.479,5.791 c0.029,0.024,0.063,0.046,0.103,0.06l6.383,2.177l-7.041,2.361L2.037,8.18L9.479,5.791z"></path>{" "}
-                  <path d="M50.54,42.987l-24.521-8.006c-0.063-0.021-0.13-0.021-0.193,0L1.304,42.987c-0.128,0.042-0.214,0.162-0.214,0.296 c0,0.136,0.088,0.255,0.216,0.296l7.693,2.469c0.023,0.011,0.047,0.019,0.072,0.022l16.756,5.377 c0.03,0.011,0.063,0.016,0.094,0.016c0.032,0,0.064-0.005,0.095-0.016l24.521-7.868c0.128-0.041,0.215-0.16,0.216-0.296 C50.753,43.148,50.667,43.029,50.54,42.987z M33.254,37.998l7.562,2.469l-6.733,2.284l-7.485-2.511l6.615-2.218 C33.228,38.017,33.239,38.005,33.254,37.998z M33.11,43.079l-7.354,2.494l-7.555-2.519l7.419-2.487L33.11,43.079z M25.921,35.604 l6.357,2.076l-6.659,2.233l-6.363-2.134L25.921,35.604z M18.271,38.102c0.004,0.002,0.008,0.005,0.012,0.006l6.359,2.132 l-7.421,2.488l-6.493-2.164L18.271,38.102z M2.409,43.28l7.341-2.396c0.014,0.007,0.023,0.017,0.037,0.021l6.455,2.152 l-7.105,2.382L2.409,43.28z M10.134,45.76l7.088-2.376l7.561,2.521l-6.904,2.342L10.134,45.76z M25.921,50.825l-7.049-2.262 l6.885-2.335l7.105,2.37L25.921,50.825z M33.81,48.295c-0.033-0.033-0.07-0.061-0.117-0.075l-6.961-2.321l7.352-2.494l7.316,2.454 L33.81,48.295z M42.399,45.539l-7.346-2.464l6.655-2.257c0.024-0.008,0.045-0.024,0.065-0.039l7.66,2.5L42.399,45.539z"></path>{" "}
-                  <path d="M1.09,10.664v29.175c0,0.171,0.139,0.311,0.31,0.311c0.173,0,0.312-0.139,0.312-0.311V10.664 c0-0.171-0.139-0.311-0.312-0.311C1.229,10.354,1.09,10.493,1.09,10.664z"></path>{" "}
-                  <path d="M9.276,13.893V36.61c0,0.146,0.118,0.265,0.265,0.265c0.146,0,0.264-0.118,0.264-0.265V13.893 c0-0.146-0.118-0.265-0.264-0.265C9.394,13.628,9.276,13.746,9.276,13.893z"></path>{" "}
-                  <path d="M49.86,10.421c-0.172,0-0.311,0.139-0.311,0.311v29.175c0,0.173,0.139,0.312,0.311,0.312s0.312-0.139,0.312-0.312V10.731 C50.171,10.561,50.032,10.421,49.86,10.421z"></path>{" "}
-                  <path d="M41.458,13.96v22.719c0,0.146,0.118,0.265,0.266,0.265c0.146,0,0.264-0.119,0.264-0.265V13.96 c0-0.146-0.118-0.265-0.264-0.265C41.576,13.695,41.458,13.813,41.458,13.96z"></path>{" "}
-                </g>{" "}
-              </g>{" "}
-            </g>
-          </svg>
+          <Navigation
+            className={`w-4 h-4 transition-transform duration-500 ${is3DMode ? "rotate-45" : ""}`}
+          />
+          <span className="font-bold text-[11px]">
+            {is3DMode ? "2D" : "3D VIEW"}
+          </span>
         </button>
 
         {/* Zoom Controls */}
         <div className="flex flex-col rounded-lg bg-[#0f172a] border border-[#334155] shadow-lg overflow-hidden">
           <button
             onClick={() => mapRef.current?.zoomIn()}
-            className="p-2.5 text-slate-300 hover:text-white hover:bg-[#1e293b] transition-colors border-b border-[#334155] cursor-pointer"
+            className="p-2.5 text-slate-300 hover:text-white hover:bg-[#1e293b] transition-colors border-b border-[#334155]"
             title="Zoom In"
           >
-            <svg
-              width="24px"
-              height="24px"
-              viewBox="0 0 24 24"
-              fill="#38bdf8"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-              <g
-                id="SVGRepo_tracerCarrier"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              ></g>
-              <g id="SVGRepo_iconCarrier">
-                {" "}
-                <path
-                  d="M4 12H20M12 4V20"
-                  stroke="#38bdf8"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                ></path>{" "}
-              </g>
-            </svg>
+            <Plus className="w-4 h-4" />
           </button>
-
           <button
             onClick={() => mapRef.current?.zoomOut()}
-            className="p-2.5 text-slate-300 hover:text-white hover:bg-[#1e293b] transition-colors cursor-pointer"
+            className="p-2.5 text-slate-300 hover:text-white hover:bg-[#1e293b] transition-colors"
             title="Zoom Out"
           >
-            <svg
-              width="24px"
-              height="24px"
-              viewBox="0 0 24 24"
-              fill="#38bdf8"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-              <g
-                id="SVGRepo_tracerCarrier"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              ></g>
-              <g id="SVGRepo_iconCarrier">
-                {" "}
-                <path
-                  d="M6 12L18 12"
-                  stroke="#38bdf8"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                ></path>{" "}
-              </g>
-            </svg>
+            <Minus className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -2761,6 +2783,22 @@ export default function MapContainer({
                   Lat: {pinDialogCoords[1].toFixed(6)}
                 </p>
               </div>
+            </div>
+
+            <div className="flex gap-2.5 pt-1">
+              <button
+                onClick={() => setPinDialogCoords(null)}
+                className="flex-1 py-2 bg-[#1e293b] hover:bg-[#334155] text-slate-300 font-bold rounded-lg text-xs border border-[#334155] transition-all"
+              >
+                Batalkan
+              </button>
+              <button
+                onClick={handleSavePin}
+                disabled={!newPinName}
+                className="flex-1 py-2 bg-[#38bdf8] hover:bg-[#0ea5e9] disabled:opacity-40 disabled:hover:bg-[#38bdf8] text-slate-950 font-bold rounded-lg text-xs transition-all shadow-md"
+              >
+                Simpan Penanda
+              </button>
             </div>
           </div>
         </div>
@@ -3593,20 +3631,38 @@ export default function MapContainer({
                       </button>
                     </div>
 
-                    {/* Scale bar segment km input */}
-
-                    <div className="border-t border-[#334155]/40 pt-2 mt-1">
-                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-1">
-                        Nilai Batas Skala Bar
-                      </label>
-                      <input
-                        type="text"
-                        value={printScaleBarKm}
-                        onChange={(e) => setPrintScaleBarKm(e.target.value)}
-                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
-                        placeholder="Contoh: 3 km atau 500 m"
-                      />
+                    {/* Toggle Skala */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-medium text-slate-300">
+                        Tampilkan Skala Bar
+                      </span>
+                      <button
+                        onClick={() => setPrintShowScale(!printShowScale)}
+                        className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
+                          printShowScale
+                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                            : "bg-slate-800 text-slate-400 border-transparent hover:text-slate-300"
+                        }`}
+                      >
+                        {printShowScale ? "AKTIF" : "Sembunyi"}
+                      </button>
                     </div>
+
+                    {/* Scale bar segment km input */}
+                    {printShowScale && (
+                      <div className="border-t border-[#334155]/40 pt-2 mt-1">
+                        <label className="block text-[9px] text-slate-400 font-mono uppercase mb-1">
+                          Nilai Batas Skala Bar
+                        </label>
+                        <input
+                          type="text"
+                          value={printScaleBarKm}
+                          onChange={(e) => setPrintScaleBarKm(e.target.value)}
+                          className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                          placeholder="Contoh: 3 km atau 500 m"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -4195,6 +4251,17 @@ export default function MapContainer({
               </button>
 
               <button
+                onClick={handleDownloadMapPNG}
+                disabled={!capturedMapUrl}
+                className="w-full py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800/40 disabled:cursor-not-allowed text-slate-200 border border-[#334155] font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Download
+                  className={`w-4 h-4 ${capturedMapUrl ? "text-emerald-400" : "text-slate-500"}`}
+                />
+                Unduh Gambar Peta (PNG)
+              </button>
+
+              <button
                 onClick={() => setPrintDialogOpen(false)}
                 className="w-full py-2 bg-[#1e293b] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-transparent font-bold font-mono rounded-lg text-xs transition-all cursor-pointer"
               >
@@ -4256,7 +4323,27 @@ export default function MapContainer({
                     </div>
                   )}
                   {/* Scale Bar */}
-
+                  {printShowScale && (
+                    <div className="absolute bottom-2 left-2 bg-white/90 border border-black px-2 py-1 rounded pointer-events-none select-none text-black flex flex-col items-start gap-0.5">
+                      <div className="flex items-center gap-0">
+                        <div className="h-1.5 w-8 bg-black border-r border-black"></div>
+                        <div className="h-1.5 w-8 bg-white border-r border-black"></div>
+                        <div className="h-1.5 w-8 bg-black border-r border-black"></div>
+                        <div className="h-1.5 w-8 bg-white"></div>
+                      </div>
+                      <div className="flex items-center gap-0 w-full text-[6px] font-mono font-bold">
+                        <span className="w-8 text-left">0</span>
+                        <span className="w-8 text-center">1</span>
+                        <span className="w-8 text-center">2</span>
+                        <span className="w-8 text-right">
+                          {printScaleBarKm}
+                        </span>
+                      </div>
+                      <span className="text-[7px] font-mono font-bold mt-0.5">
+                        {printScaleText || "1:25.000"}
+                      </span>
+                    </div>
+                  )}
                   {/* Creator / Source text */}
                   <div className="absolute bottom-2 right-2 bg-white/80 border border-black px-2 py-1 text-[7px] font-mono font-bold rounded pointer-events-none select-none text-black max-w-[180px] text-right leading-tight">
                     {printSourceText || "Sumber: Bappeda Banda Aceh"}
@@ -4398,36 +4485,9 @@ export default function MapContainer({
                       {printShowCompass && (
                         <div className="border-b-2 border-black pb-2.5 flex justify-center items-center gap-4 py-1">
                           <div className="flex flex-col items-center">
-                            <svg
-                              width="24px"
-                              height="24px"
-                              viewBox="0 0 100 100"
-                              xmlns="http://www.w3.org/2000/svg"
-                              aria-hidden="true"
-                              role="img"
-                              className="iconify iconify--gis"
-                              preserveAspectRatio="xMidYMid meet"
-                              fill="#000000"
-                            >
-                              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-                              <g
-                                id="SVGRepo_tracerCarrier"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              ></g>
-                              <g id="SVGRepo_iconCarrier">
-                                <path
-                                  d="M42.066 0v20h3.752V6.957L53.881 20h4.053V0h-3.752v13.355L45.996 0zm5.57 26.688l-25.77 69.949c-.823 2.238 1.658 4.248 3.677 2.978L50 84.195l24.455 15.42c2.02 1.273 4.504-.738 3.68-2.978l-25.79-70c-.472-1.096-1.283-1.632-2.384-1.635c-1.1-.003-2.017.856-2.324 1.686zm-.136 14.83V79.86L29.1 91.463z"
-                                  fill="#000000"
-                                  fillRule="evenodd"
-                                ></path>
-                              </g>
-                            </svg>
+                            <Compass className="w-8 h-8 text-black" />
                             <span className="text-[7px] font-bold mt-0.5 font-mono">
-                              ARAH UTARA
-                            </span>
-                            <span className="text-[10px] mt-0.5 font-mono">
-                              Skala: {printScaleText || "1:25.000"}
+                              NORTH / UTARA
                             </span>
                           </div>
                         </div>
@@ -4441,6 +4501,30 @@ export default function MapContainer({
                           </h5>
                           <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
                             {/* Standard Layers */}
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <div className="w-4 h-2.5 border border-black bg-emerald-500/10" />
+                              <span className="font-mono text-[8px] leading-tight">
+                                Batas Administrasi Kecamatan
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <div className="w-4 h-0.5 bg-red-500" />
+                              <span className="font-mono text-[8px] leading-tight">
+                                Jaringan Jalan Utama
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <div className="w-4 h-0.5 bg-blue-500" />
+                              <span className="font-mono text-[8px] leading-tight">
+                                Hidrologi Aliran Sungai
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black" />
+                              <span className="font-mono text-[8px] leading-tight">
+                                Titik Landmark & Fasilitas
+                              </span>
+                            </div>
 
                             {/* Dynamic Active Layers from Application */}
                             {layers
@@ -4489,7 +4573,11 @@ export default function MapContainer({
                       <div className="truncate">
                         {printSourceText || "Sumber: Bappeda Banda Aceh"}
                       </div>
-
+                      {printShowScale && (
+                        <div className="truncate">
+                          Skala: {printScaleText || "1:25.000"}
+                        </div>
+                      )}
                       <div className="truncate">
                         Tanggal Cetak:{" "}
                         {new Date().toLocaleDateString("id-ID", {
@@ -4619,37 +4707,35 @@ export default function MapContainer({
                       <div className="flex flex-col items-center justify-center shrink-0">
                         {printShowCompass ? (
                           <div className="flex flex-col items-center justify-center">
-                            <svg
-                              width="24px"
-                              height="24px"
-                              viewBox="0 0 100 100"
-                              xmlns="http://www.w3.org/2000/svg"
-                              aria-hidden="true"
-                              role="img"
-                              className="iconify iconify--gis"
-                              preserveAspectRatio="xMidYMid meet"
-                              fill="#000000"
-                            >
-                              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-                              <g
-                                id="SVGRepo_tracerCarrier"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              ></g>
-                              <g id="SVGRepo_iconCarrier">
-                                <path
-                                  d="M42.066 0v20h3.752V6.957L53.881 20h4.053V0h-3.752v13.355L45.996 0zm5.57 26.688l-25.77 69.949c-.823 2.238 1.658 4.248 3.677 2.978L50 84.195l24.455 15.42c2.02 1.273 4.504-.738 3.68-2.978l-25.79-70c-.472-1.096-1.283-1.632-2.384-1.635c-1.1-.003-2.017.856-2.324 1.686zm-.136 14.83V79.86L29.1 91.463z"
-                                  fill="#000000"
-                                  fillRule="evenodd"
-                                ></path>
-                              </g>
-                            </svg>
+                            <Compass className="w-7 h-7 text-black" />
                             <span className="text-[6px] font-bold mt-0.5 font-mono">
-                              ARAH UTARA
+                              NORTH / UTARA
                             </span>
                           </div>
                         ) : (
                           <div className="h-7" />
+                        )}
+                        {/* Scale bar mini */}
+                        {printShowScale && (
+                          <div className="mt-1 flex flex-col items-center">
+                            <div className="flex items-center gap-0">
+                              <div className="h-1 w-5 bg-black border-r border-black"></div>
+                              <div className="h-1 w-5 bg-white border-r border-black"></div>
+                              <div className="h-1 w-5 bg-black border-r border-black"></div>
+                              <div className="h-1 w-5 bg-white"></div>
+                            </div>
+                            <div className="flex items-center gap-0 w-full text-[5px] font-mono font-bold">
+                              <span className="w-5 text-left">0</span>
+                              <span className="w-5 text-center">1</span>
+                              <span className="w-5 text-center">2</span>
+                              <span className="w-5 text-right">
+                                {printScaleBarKm}
+                              </span>
+                            </div>
+                            <span className="text-[6px] font-mono font-bold">
+                              {printScaleText || "1:25.000"}
+                            </span>
+                          </div>
                         )}
                       </div>
                       <div className="text-[7px] font-mono leading-snug text-slate-600 flex flex-col justify-center min-w-0">
