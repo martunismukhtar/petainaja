@@ -65,6 +65,11 @@ interface SidebarProps {
   ) => void;
   onCreateWmsLayer?: (name: string, url: string, layersParam: string) => void;
   onRenameLayer?: (id: string, newName: string) => void;
+  onUpdateWmsParams?: (
+    id: string | LayerId,
+    wmsUrl: string,
+    wmsLayers: string,
+  ) => void;
   onDeleteFeature?: (layerId: string, featureIndex: number) => void;
   onUpdateFeatureProperties?: (
     layerId: string,
@@ -100,6 +105,7 @@ export default function Sidebar({
   onEditFeature,
   onCreateWmsLayer,
   onRenameLayer,
+  onUpdateWmsParams,
   onDeleteFeature,
   onUpdateFeatureProperties,
 }: SidebarProps) {
@@ -124,6 +130,23 @@ export default function Sidebar({
     "https://kemendagri.go.id/geoserver/wms",
   );
   const [wmsLayers, setWmsLayers] = useState("0");
+
+  const [editWmsUrl, setEditWmsUrl] = useState("");
+  const [editWmsLayers, setEditWmsLayers] = useState("");
+
+  // Synchronize WMS editing local state when the active layer changes
+  useEffect(() => {
+    if (activeLayerConfigId) {
+      const activeLayer = layers.find((l) => l.id === activeLayerConfigId);
+      if (activeLayer && activeLayer.type === "wms") {
+        setEditWmsUrl(activeLayer.wmsUrl || "");
+        setEditWmsLayers(activeLayer.wmsLayers || "");
+      }
+    } else {
+      setEditWmsUrl("");
+      setEditWmsLayers("");
+    }
+  }, [activeLayerConfigId, layers]);
 
   const handleCreateLayerSubmit = () => {
     if (!newLayerName.trim()) return;
@@ -545,28 +568,86 @@ export default function Sidebar({
                   {activeLayerConfigId === layer.id && (
                     <div className="p-3 bg-[#0f172a] border-t border-[#334155] text-xs space-y-3 animate-in slide-in-from-top-1 duration-150">
                       {layer.type === "wms" ? (
-                        /* WMS Layer ONLY displays Opacity as requested */
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 font-mono">
-                            <span>Transparansi (Opacity)</span>
-                            <span className="text-[#38bdf8]">
-                              {Math.round(layer.opacity * 100)}%
+                        <div className="space-y-3 animate-in slide-in-from-top-1 duration-150">
+                          {/* Rename Layer */}
+                          <div className="space-y-1 bg-[#1e293b]/30 p-2 rounded-lg border border-[#334155]/30">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">
+                              ✏️ Edit Nama Layer
                             </span>
+                            <input
+                              type="text"
+                              value={layer.name}
+                              onChange={(e) =>
+                                onRenameLayer?.(layer.id, e.target.value)
+                              }
+                              className="w-full bg-[#0f172a] border border-[#334155] rounded-md px-2 py-1 text-slate-100 font-mono text-[11px] focus:outline-none focus:border-[#38bdf8]"
+                            />
                           </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.05"
-                            value={layer.opacity}
-                            onChange={(e) =>
-                              onUpdateLayerOpacity(
-                                layer.id,
-                                parseFloat(e.target.value),
-                              )
-                            }
-                            className="w-full accent-[#38bdf8] h-1 bg-[#1e293b] rounded-lg appearance-none cursor-pointer"
-                          />
+
+                          {/* URL Server WMS */}
+                          <div className="space-y-1 bg-[#1e293b]/30 p-2 rounded-lg border border-[#334155]/30">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">
+                              🔗 URL Server WMS
+                            </span>
+                            <input
+                              type="text"
+                              value={editWmsUrl}
+                              onChange={(e) => setEditWmsUrl(e.target.value)}
+                              placeholder="https://server.com/geoserver/wms"
+                              className="w-full bg-[#0f172a] border border-[#334155] rounded-md px-2 py-1 text-slate-100 font-mono text-[11px] focus:outline-none focus:border-[#38bdf8]"
+                            />
+                          </div>
+
+                          {/* Parameter WMS */}
+                          <div className="space-y-1 bg-[#1e293b]/30 p-2 rounded-lg border border-[#334155]/30">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">
+                              ⚙️ Parameter Layer (WMS layers)
+                            </span>
+                            <input
+                              type="text"
+                              value={editWmsLayers}
+                              onChange={(e) => setEditWmsLayers(e.target.value)}
+                              placeholder="workspace:layer_name"
+                              className="w-full bg-[#0f172a] border border-[#334155] rounded-md px-2 py-1 text-slate-100 font-mono text-[11px] focus:outline-none focus:border-[#38bdf8]"
+                            />
+                          </div>
+
+                          {/* Save Button for WMS URL & Parameter */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onUpdateWmsParams?.(layer.id, editWmsUrl.trim(), editWmsLayers.trim());
+                              alert("Parameter WMS berhasil diperbarui!");
+                            }}
+                            disabled={!editWmsUrl.trim() || !editWmsLayers.trim()}
+                            className="w-full py-1.5 bg-[#38bdf8] hover:bg-[#0284c7] disabled:opacity-50 text-slate-950 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                          >
+                            Simpan Parameter WMS
+                          </button>
+
+                          {/* Opacity slider */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 font-mono">
+                              <span>Transparansi (Opacity)</span>
+                              <span className="text-[#38bdf8]">
+                                {Math.round(layer.opacity * 100)}%
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.05"
+                              value={layer.opacity}
+                              onChange={(e) =>
+                                onUpdateLayerOpacity(
+                                  layer.id,
+                                  parseFloat(e.target.value),
+                                )
+                              }
+                              className="w-full accent-[#38bdf8] h-1 bg-[#1e293b] rounded-lg appearance-none cursor-pointer"
+                            />
+                          </div>
                         </div>
                       ) : (
                         <>

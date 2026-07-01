@@ -6,36 +6,45 @@ import tailwindcss from "@tailwindcss/vite";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+
   base: "/",
+
   build: {
+    chunkSizeWarningLimit: 1000,
+
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("node_modules")) {
-            if (id.includes("react")) {
-              return "react-vendor";
-            }
-
-            if (id.includes("maplibre") || id.includes("mapbox") || id.includes('maplibre-gl')) {
-              return "map";
-            }
-
-            if (id.includes("@turf") || id.includes("proj4")) {
-              return "geoprocessing";
-            }
-
-            if (id.includes("shpjs") || id.includes("papaparse")) {
-              return "parsers";
-            }
-
-            return "vendor";
+          if (!id.includes("node_modules")) {
+            return;
           }
+
+          if (id.includes("/react/") || id.includes("/react-dom/")) {
+            return "react-vendor";
+          }
+
+          if (id.includes("maplibre") || id.includes("mapbox")) {
+            return "map";
+          }
+
+          if (id.includes("@turf") || id.includes("proj4")) {
+            return "geoprocessing";
+          }
+
+          if (id.includes("shpjs") || id.includes("papaparse")) {
+            return "parsers";
+          }
+
+          if (id.includes("duckdb")) {
+            return "duckdb-wasm";
+          }
+
+          return "vendor";
         },
       },
     },
   },
 });
-
 
 // export default defineConfig({
 //   plugins: [

@@ -584,6 +584,24 @@ export default function MapContainer({
   const [isPinDragging, setIsPinDragging] = useState(false);
   const [pinDragStart, setPinDragStart] = useState({ x: 0, y: 0 });
 
+  // Mobile optimization panel states
+  const [isDrawPanelMinimized, setIsDrawPanelMinimized] = useState(() => window.innerWidth < 768);
+  const [isEditPanelMinimized, setIsEditPanelMinimized] = useState(() => window.innerWidth < 768);
+
+  // Auto-minimize on mobile when drawing starts
+  useEffect(() => {
+    if (drawingLayerId) {
+      setIsDrawPanelMinimized(window.innerWidth < 768);
+    }
+  }, [drawingLayerId]);
+
+  // Auto-minimize on mobile when editing starts
+  useEffect(() => {
+    if (editingFeature) {
+      setIsEditPanelMinimized(window.innerWidth < 768);
+    }
+  }, [editingFeature]);
+
   // --- DRAGGING EFFECT FOR DRAWING MODAL ---
   const handleDrawDragMouseDown = (e: React.MouseEvent) => {
     if (
@@ -1232,10 +1250,21 @@ export default function MapContainer({
         const sourceId = `wms-source-${layer.id}`;
         const mainLayerId = `wms-layer-${layer.id}`;
 
-        if (!map.getSource(sourceId)) {
-          const separator = layer.wmsUrl.includes("?") ? "&" : "?";
-          const wmsTileUrl = `${layer.wmsUrl}${separator}service=WMS&version=1.1.1&request=GetMap&bbox={bbox-epsg-3857}&width=256&height=256&srs=EPSG:3857&format=image/png&transparent=true&layers=${layer.wmsLayers || "0"}`;
+        const separator = layer.wmsUrl.includes("?") ? "&" : "?";
+        const wmsTileUrl = `${layer.wmsUrl}${separator}service=WMS&version=1.1.1&request=GetMap&bbox={bbox-epsg-3857}&width=256&height=256&srs=EPSG:3857&format=image/png&transparent=true&layers=${layer.wmsLayers || "0"}`;
 
+        const existingSource = map.getSource(sourceId) as any;
+        if (existingSource) {
+          const existingTiles = existingSource.tiles || [];
+          if (existingTiles[0] !== wmsTileUrl) {
+            if (map.getLayer(mainLayerId)) {
+              map.removeLayer(mainLayerId);
+            }
+            map.removeSource(sourceId);
+          }
+        }
+
+        if (!map.getSource(sourceId)) {
           map.addSource(sourceId, {
             type: "raster",
             tiles: [wmsTileUrl],
@@ -2835,6 +2864,64 @@ export default function MapContainer({
             }
           };
 
+          if (isEditPanelMinimized) {
+            return (
+              <div
+                style={{
+                  top: "16px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                }}
+                className="absolute bg-[#0f172a]/95 border-2 border-orange-500 rounded-lg shadow-xl px-3 py-2.5 z-40 w-[92%] max-w-sm text-slate-100 flex flex-col gap-1.5 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs select-none"
+              >
+                <div className="flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+                    <span className="font-bold text-[11px]">✏️ Edit: {targetLayer?.name || "Layer"}</span>
+                  </div>
+                  <div className="text-[10px] text-orange-400 font-mono font-bold">
+                    {activeEditingCoords.length} Vertex
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-1.5 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={handleAddVertexAtCenter}
+                    className="flex-1 py-1 px-2 bg-orange-600/10 hover:bg-orange-600/30 text-orange-400 border border-orange-500/20 rounded text-[10px] font-mono transition-all truncate cursor-pointer"
+                  >
+                    ➕ Vertex
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveEdits}
+                    className="flex-1 py-1 px-2 bg-orange-600 hover:bg-orange-500 text-white font-bold font-mono rounded text-[10px] transition-all truncate cursor-pointer"
+                  >
+                    💾 Simpan
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsEditPanelMinimized(false)}
+                    className="py-1 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold font-mono rounded text-[10px] border border-[#334155] transition-all cursor-pointer shrink-0"
+                  >
+                    ⚙️ Atribut
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onCancelEditing}
+                    className="p-1 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-300 rounded border border-transparent hover:border-red-500/30 transition-all cursor-pointer"
+                    title="Batalkan perubahan"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               style={{
@@ -2858,8 +2945,18 @@ export default function MapContainer({
                     </span>
                   </h4>
                 </div>
-                <div className="text-[10px] font-mono text-slate-400">
-                  {activeEditingCoords.length} Vertex Aktif
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditPanelMinimized(true)}
+                    className="px-2 py-0.5 bg-orange-600/10 hover:bg-orange-600/30 text-orange-400 border border-orange-500/20 rounded text-[9px] font-mono transition-all cursor-pointer flex items-center gap-1"
+                    title="Sembunyikan panel lengkap"
+                  >
+                    🗕 Ringkas
+                  </button>
+                  <div className="text-[10px] font-mono text-slate-400">
+                    {activeEditingCoords.length} Vertex Aktif
+                  </div>
                 </div>
               </div>
 
@@ -3051,6 +3148,73 @@ export default function MapContainer({
             });
           };
 
+          if (isDrawPanelMinimized) {
+            return (
+              <div
+                style={{
+                  top: "16px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                }}
+                className="absolute bg-[#0f172a]/95 border-2 border-red-500 rounded-lg shadow-xl px-3 py-2.5 z-40 w-[92%] max-w-sm text-slate-100 flex flex-col gap-1.5 animate-in slide-in-from-top-4 duration-200 backdrop-blur-xs select-none"
+              >
+                <div className="flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                    <span className="font-bold text-[11px]">✍️ Gambar: {targetLayer?.name || "Layer"}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    {drawPoints.length} Pts | {sessionFeatures.length} Sesi
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-1.5 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={handleAddActiveToList}
+                    disabled={!isValidActiveShape}
+                    className="flex-1 py-1 px-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold font-mono rounded text-[10px] transition-all truncate cursor-pointer"
+                    title="Tambah objek aktif ke sesi"
+                  >
+                    ➕ Sesi ({sessionFeatures.length + 1})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveAllAndClose}
+                    disabled={sessionFeatures.length === 0 && !isValidActiveShape}
+                    className="flex-1 py-1 px-2 bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white font-bold font-mono rounded text-[10px] transition-all truncate cursor-pointer"
+                  >
+                    💾 Simpan ({sessionFeatures.length + (isValidActiveShape ? 1 : 0)})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsDrawPanelMinimized(false)}
+                    className="py-1 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold font-mono rounded text-[10px] border border-[#334155] transition-all cursor-pointer shrink-0"
+                  >
+                    ⚙️ Atribut
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("Batalkan sesi menggambar?")) {
+                        setDrawPoints([]);
+                        setSessionFeatures([]);
+                        onSaveDrawnFeature(drawingLayerId, null, null);
+                      }
+                    }}
+                    className="p-1 bg-slate-800 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded border border-transparent hover:border-red-500/30 transition-all cursor-pointer"
+                    title="Batalkan menggambar"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               style={{
@@ -3074,9 +3238,18 @@ export default function MapContainer({
                     </span>
                   </h4>
                 </div>
-                <div className="text-[10px] font-mono text-slate-400">
-                  {drawPoints.length} Titik Aktif | {sessionFeatures.length}{" "}
-                  Sesi Terkumpul
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsDrawPanelMinimized(true)}
+                    className="px-2 py-0.5 bg-red-500/10 hover:bg-red-500/30 text-red-400 border border-red-500/20 rounded text-[9px] font-mono transition-all cursor-pointer flex items-center gap-1"
+                    title="Sembunyikan panel lengkap"
+                  >
+                    🗕 Ringkas
+                  </button>
+                  <div className="text-[10px] font-mono text-slate-400">
+                    {drawPoints.length} Pts | {sessionFeatures.length} Sesi
+                  </div>
                 </div>
               </div>
 

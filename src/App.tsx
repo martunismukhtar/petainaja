@@ -57,16 +57,26 @@ export default function App() {
   const [clickedFeature, setClickedFeature] = useState<ClickedFeatureInfo | null>(null);  
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(window.innerWidth >= 768);
 
-  // Auto-hide sidebar on mobile screens on mount and handle resize
+  // Auto-hide sidebar on mobile screens on mount and handle resize (hanya jika lebar viewport berubah, menghindari bug keyboard virtual mobile)
   React.useEffect(() => {
+    let lastWidth = window.innerWidth;
     const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
-      } else {
-        setIsSidebarOpen(true);
+      const currentWidth = window.innerWidth;
+      if (currentWidth !== lastWidth) {
+        lastWidth = currentWidth;
+        if (currentWidth < 768) {
+          setIsSidebarOpen(false);
+        } else {
+          setIsSidebarOpen(true);
+        }
       }
     };
-    handleResize();
+    // Set initial state
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    } else {
+      setIsSidebarOpen(true);
+    }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -132,6 +142,12 @@ export default function App() {
   const handleRenameLayer = (id: string, name: string) => {
     setLayers((prev) =>
       prev.map((l) => (l.id === id ? { ...l, name } : l))
+    );
+  };
+
+  const handleUpdateWmsParams = (id: LayerId | string, wmsUrl: string, wmsLayers: string) => {
+    setLayers((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, wmsUrl, wmsLayers } : l))
     );
   };
 
@@ -240,6 +256,8 @@ export default function App() {
       );
       // Deactivate other spatial analysis tools
       setActiveTool("none");
+      // Otomatis sembunyikan sidebar saat mulai menggambar fitur baru
+      setIsSidebarOpen(false);
     }
   };
 
@@ -840,6 +858,7 @@ export default function App() {
             onEditFeature={handleEditFeature}
             onCreateWmsLayer={handleCreateWmsLayer}
             onRenameLayer={handleRenameLayer}
+            onUpdateWmsParams={handleUpdateWmsParams}
             onDeleteFeature={handleDeleteFeature}
             onUpdateFeatureProperties={handleUpdateFeatureProperties}
           />
