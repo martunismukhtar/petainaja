@@ -1,0 +1,6 @@
+{
+  "name": "PetainAja",
+  "description": "Sistem Informasi Geografis (WebGIS) modern dan interaktif dengan dukungan multi-layer, real-time tracking koordinat, sinkronisasi Mini Map, serta fitur analisis spasial seperti pembuatan buffer dan pengukuran jarak.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

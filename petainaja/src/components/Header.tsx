@@ -9,6 +9,7 @@ import {
   FolderArchive,
   Ruler,
   Radio,
+  BarChart2,
   Menu,
   ChevronDown,
   HelpCircle,
@@ -21,6 +22,7 @@ import {
   Info,
   Table,
   Globe,
+  FileText,
 } from "lucide-react";
 import type { BasemapId, GisTool } from "../types";
 
