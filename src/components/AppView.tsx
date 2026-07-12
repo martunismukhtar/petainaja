@@ -12,6 +12,7 @@ import { StatsModal } from "./StatsModal";
 import { AttributeTableModal } from "./AttributeTableModal";
 import { LayerDesignAssistant } from "./LayerDesignAssistant";
 import { FeatureInfoModal } from "./FeatureInfoModal";
+import { WelcomeModal } from "./WelcomeModal";
 import type { BasemapId, GisLayer, GisTool, ClickedFeatureInfo, EditingFeature } from "../types";
 
 interface AppViewProps {
@@ -166,6 +167,14 @@ export const AppView: React.FC<AppViewProps> = ({
   const [activeAssistantLayerId, setActiveAssistantLayerId] = useState<string | null>(null);
   const [prevLayersCount, setPrevLayersCount] = useState(layers.length);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
+  useEffect(() => {
+    const isDismissed = localStorage.getItem("petainaja_welcome_dismissed");
+    if (isDismissed !== "true") {
+      setShowWelcomeModal(true);
+    }
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -186,7 +195,7 @@ export const AppView: React.FC<AppViewProps> = ({
   }, [layers, prevLayersCount]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0f172a] font-sans antialiased text-slate-100 animate-fade-in">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50 font-sans antialiased text-slate-800 animate-fade-in">
       {/* Hidden Native File Input for geojson loading */}
       <input
         type="file"
@@ -210,6 +219,7 @@ export const AppView: React.FC<AppViewProps> = ({
         onCreateWmsLayer={handleCreateWmsLayer}
         onCreateVectorTileLayer={handleCreateVectorTileLayer}
         onCreatePmtilesLayer={handleCreatePmtilesLayer}
+        onOpenWelcome={() => setShowWelcomeModal(true)}
       />
 
       {/* Main Body Layout (Sidebar + Map View) */}
@@ -293,6 +303,11 @@ export const AppView: React.FC<AppViewProps> = ({
       {/* REGIONAL STATISTICS POPUP DIALOG MODAL */}
       {showStatsModal && (
         <StatsModal onClose={() => setShowStatsModal(false)} />
+      )}
+
+      {/* WELCOME INFO & FEATURES MODAL */}
+      {showWelcomeModal && (
+        <WelcomeModal onClose={() => setShowWelcomeModal(false)} />
       )}
 
       {/* ATTRIBUTE TABLE POPUP DIALOG MODAL */}

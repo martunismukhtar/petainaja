@@ -38,6 +38,7 @@ interface HeaderProps {
   onCreateWmsLayer?: (name: string, url: string, layersParam: string) => void;
   onCreateVectorTileLayer?: (name: string, url: string, layersParam: string, geomType: "fill" | "line" | "circle", color: string) => void;
   onCreatePmtilesLayer?: (name: string, url: string, layersParam: string, geomType: "fill" | "line" | "circle", color: string) => void;
+  onOpenWelcome?: () => void;
 }
 
 export default function Header({
@@ -54,6 +55,7 @@ export default function Header({
   onCreateWmsLayer,
   onCreateVectorTileLayer,
   onCreatePmtilesLayer,
+  onOpenWelcome,
 }: HeaderProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -1231,7 +1233,19 @@ export default function Header({
             </div>
 
             {/* Modal Footer */}
-            <div className="border-t border-[#334155] pt-4 mt-4 flex justify-end">
+            <div className="border-t border-[#334155] pt-4 mt-4 flex justify-between items-center">
+              {onOpenWelcome && (
+                <button
+                  onClick={() => {
+                    setIsHelpOpen(false);
+                    onOpenWelcome();
+                  }}
+                  className="px-4 py-2 bg-[#38bdf8]/10 hover:bg-[#38bdf8]/20 text-[#38bdf8] hover:text-white font-bold font-sans rounded-lg border border-[#38bdf8]/30 transition-all cursor-pointer text-xs flex items-center gap-1.5"
+                >
+                  <Map className="w-3.5 h-3.5" />
+                  Info & Fitur Aplikasi
+                </button>
+              )}
               <button
                 onClick={() => setIsHelpOpen(false)}
                 className="px-5 py-2 bg-[#1e293b] hover:bg-[#334155] text-slate-200 hover:text-white font-bold font-sans rounded-lg transition-all cursor-pointer text-xs"

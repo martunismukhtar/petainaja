@@ -5,7 +5,6 @@ import {
   Info,
   Map,
   Sparkles,
-  Search,
   ChevronDown,
   ChevronUp,
   Sliders,
@@ -130,7 +129,7 @@ export default function Sidebar({
   onZoomToFeature,
   getFeatureCenter,
 }: SidebarProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  
   const [confirmDeleteFeature, setConfirmDeleteFeature] = useState<{
     layerId: string;
     featureIndex: number;
@@ -286,18 +285,13 @@ export default function Sidebar({
     }, 2000);
   };
 
-  // Filter layers or search inside feature attributes (if applicable)
-  const filteredLayers = layers.filter((layer) =>
-    layer.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
   useEffect(()=>{
     console.log(layers)
   }, [])
 
   return (
     <aside className="w-80 bg-[#0f172a] border-r border-[#334155] flex flex-col h-full text-slate-100 select-none z-40 shadow-lg absolute md:relative left-0 top-0 bottom-0">
-      {/* Sidebar Header / Search */}
+      {/* Sidebar Header */}
       <div className="p-4 border-b border-[#334155] bg-[#0f172a] flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -320,24 +314,6 @@ export default function Sidebar({
               </button>
             )}
           </div>
-        </div>
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Cari layer atau data..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#1e293b] border border-[#334155] rounded-md py-1.5 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all"
-          />
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 text-xs"
-            >
-              ✕
-            </button>
-          )}
         </div>
       </div>
 
@@ -679,7 +655,7 @@ export default function Sidebar({
                 )}
               </div>
 
-              {filteredLayers.map((layer) => (
+              {layers.map((layer) => (
                 <div
                   key={layer.id}
                   className="flex flex-col bg-[#1e293b]/20 rounded-md border border-[#334155]/30 overflow-hidden mb-1"

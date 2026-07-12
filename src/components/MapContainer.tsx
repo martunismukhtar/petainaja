@@ -35,6 +35,10 @@ import {
   Eye,
   EyeOff,
   Scissors,
+  Sparkles,
+  ShieldAlert,
+  TrendingUp,
+  Plus,
 } from "lucide-react";
 
 export interface PrintLayoutElement {
@@ -241,6 +245,7 @@ export default function MapContainer({
 
   // Print & Layout States
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printTemplate, setPrintTemplate] = useState<string>("default");
   const [printTitle, setPrintTitle] = useState("PETA SPASIAL KOTA BANDA ACEH");
   const [printSubtitle, setPrintSubtitle] = useState(
     "Badan Perencanaan Pembangunan Daerah Kota Banda Aceh",
@@ -272,6 +277,65 @@ export default function MapContainer({
   const [printCartographer, setPrintCartographer] =
     useState("Bappeda Banda Aceh");
   const printLogoInputRef = useRef<HTMLInputElement>(null);
+  const layoutImageInputRef = useRef<HTMLInputElement>(null);
+
+  // Template-specific customizable fields
+  const [tempInsetTitle, setTempInsetTitle] = useState("PETA INSET REGIONAL");
+  const [tempInsetDescription, setTempInsetDescription] = useState("Banda Aceh & Pantai Barat Sumatera");
+  const [tempMagLabel, setTempMagLabel] = useState("GEOGRAPHIC INSIGHT");
+  const [tempMagPage, setTempMagPage] = useState("[Halaman 12]");
+  const [tempAcademicFigure, setTempAcademicFigure] = useState("Figure 3. Spatiotemporal Distribution of");
+  const [tempAcademicSubmitted, setTempAcademicSubmitted] = useState("Submitted: Anno 2026");
+  const [tempCorpClient, setTempCorpClient] = useState("PT. Global Dinamika");
+  const [tempCorpMetrics, setTempCorpMetrics] = useState([
+    { name: "Zona A", value: "70" },
+    { name: "Zona B", value: "45" }
+  ]);
+  const [tempCorpKPIs, setTempCorpKPIs] = useState([
+    { label: "Luas (Ha)", value: "12.5K" },
+    { label: "Akurasi", value: "98.2%" }
+  ]);
+  const [tempExecLabel, setTempExecLabel] = useState("EXECUTIVE MAP BRIEF");
+  const [tempExecInsights, setTempExecInsights] = useState([
+    "Zonasi Strategis: Teridentifikasi di bagian barat laut wilayah studi dengan konsentrasi tinggi.",
+    "Aksesibilitas: Area penyangga (buffer) menjangkau layanan prima sebesar 85% populasi."
+  ]);
+  const [tempGovSheet, setTempGovSheet] = useState("4862-IV-A");
+  const [tempGovEdition, setTempGovEdition] = useState("Juli 2026");
+  const [tempGovContour, setTempGovContour] = useState("12.5 M");
+  const [tempPosterNarrative, setTempPosterNarrative] = useState(
+    "Peta ini menggambarkan hubungan spasial interaktif dalam wilayah perkotaan. Melalui analisis buffer, kita dapat memvisualisasikan bagaimana zonasi wilayah mempengaruhi aktivitas perekonomian dan kerawanan bencana alam. Setiap poligon memiliki narasi tersendiri dalam mewujudkan keadilan tata ruang bagi masyarakat."
+  );
+  const [tempInfoMetrics, setTempInfoMetrics] = useState([
+    { label: "Ha Area", value: "12.5K" },
+    { label: "Jiwa", value: "250K" },
+    { label: "Zonasi", value: "85%" },
+    { label: "Evakuasi", value: "42" }
+  ]);
+  const [tempInfoCallouts, setTempInfoCallouts] = useState([
+    { title: "Mitigasi Kebencanaan", text: "Kerentanan bencana mencakup pesisir." },
+    { title: "Potensi Wilayah", text: "Area komersial baru di koridor timur." },
+    { title: "Akurasi Spasial", text: "Menggunakan survei GCP akurasi tinggi." }
+  ]);
+  const [tempVintageTop, setTempVintageTop] = useState("✥ NOVUM CARTO GRAPHIA ✥");
+
+  // Grid states for map printing
+  const [printShowGrid, setPrintShowGrid] = useState<boolean>(true);
+  const [printGridInterval, setPrintGridInterval] = useState<number>(4); // divisions (e.g. 4 means 3 lines)
+  const [printGridStyle, setPrintGridStyle] = useState<"line" | "cross" | "tick">("line");
+  const [printGridColor, setPrintGridColor] = useState<string>("rgba(0, 0, 0, 0.35)");
+  const [printGridLabelFormat, setPrintGridLabelFormat] = useState<"dms" | "decimal" | "utm">("dms");
+  const [printGridLabelSize, setPrintGridLabelSize] = useState<number>(8); // px
+  const [printMapBounds, setPrintMapBounds] = useState<{
+    west: number;
+    east: number;
+    south: number;
+    north: number;
+  } | null>(null);
+
+  // Editable Legend elements
+  const [printLegendTitle, setPrintLegendTitle] = useState<string>("LEGENDA PETA");
+  const [printLayerLegendNames, setPrintLayerLegendNames] = useState<Record<string, string>>({});
 
   // Dynamic layout print elements
   const [printSidebarTab, setPrintSidebarTab] = useState<"info" | "elements">(
@@ -279,17 +343,7 @@ export default function MapContainer({
   );
   const [printLayoutElements, setPrintLayoutElements] = useState<
     PrintLayoutElement[]
-  >([
-    {
-      id: "preset-north",
-      type: "image",
-      x: 88,
-      y: 12,
-      width: 50,
-      height: 50,
-      imageUrl: CLASSIC_NORTH_ARROW,
-    },
-  ]);
+  >([]);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
     null,
   );
@@ -435,23 +489,37 @@ export default function MapContainer({
       rectFillColor: "rgba(255, 255, 255, 0.7)",
       rectBorderColor: "#000000",
       rectBorderWidth: 2,
+      rotation: 0,
     };
     setPrintLayoutElements((prev) => [...prev, newEl]);
     setSelectedElementId(newEl.id);
   };
 
-  const handleAddImageElement = () => {
-    const newEl: PrintLayoutElement = {
-      id: `image-${Date.now()}`,
-      type: "image",
-      x: 50,
-      y: 50,
-      width: 60,
-      height: 60,
-      imageUrl: CLASSIC_NORTH_ARROW,
-    };
-    setPrintLayoutElements((prev) => [...prev, newEl]);
-    setSelectedElementId(newEl.id);
+  const handleAddUploadedImageElement = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          const newEl: PrintLayoutElement = {
+            id: `image-${Date.now()}`,
+            type: "image",
+            x: 50,
+            y: 50,
+            width: 80,
+            height: 80,
+            imageUrl: reader.result,
+          };
+          setPrintLayoutElements((prev) => [...prev, newEl]);
+          setSelectedElementId(newEl.id);
+        }
+      };
+      reader.readAsDataURL(file);
+      // Reset input value so same file can be uploaded again if needed
+      e.target.value = "";
+    }
   };
 
   const handleUploadElementImage = (
@@ -2740,6 +2808,90 @@ export default function MapContainer({
     setPrintDialogOpen(true);
     setCapturedMapUrl(null);
 
+    // Save map bounds for grid coordinate calculation and automatic scale calculation
+    try {
+      const bounds = map.getBounds();
+      const zoom = map.getZoom();
+      const center = map.getCenter();
+
+      if (bounds) {
+        setPrintMapBounds({
+          west: bounds.getWest(),
+          east: bounds.getEast(),
+          south: bounds.getSouth(),
+          north: bounds.getNorth(),
+        });
+
+        // 1. Calculate automatic Scale Text
+        const lat = center.lat;
+        // Ground resolution in meters per pixel
+        const metersPerPx = (156543.033928 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
+        // Assuming standard screen reference of 96 DPI (37.795275 pixels per cm)
+        const pixelsPerCm = 37.795275;
+        const scaleRatioRaw = metersPerPx * pixelsPerCm * 100;
+
+        // Round to nearest logical cartographic scale
+        let roundedScale = 25000;
+        if (scaleRatioRaw < 750) {
+          roundedScale = Math.round(scaleRatioRaw / 50) * 50;
+        } else if (scaleRatioRaw < 3000) {
+          roundedScale = Math.round(scaleRatioRaw / 250) * 250;
+        } else if (scaleRatioRaw < 7500) {
+          roundedScale = Math.round(scaleRatioRaw / 500) * 500;
+        } else if (scaleRatioRaw < 15000) {
+          roundedScale = Math.round(scaleRatioRaw / 1000) * 1000;
+        } else if (scaleRatioRaw < 35000) {
+          roundedScale = Math.round(scaleRatioRaw / 2500) * 2500;
+        } else if (scaleRatioRaw < 75000) {
+          roundedScale = Math.round(scaleRatioRaw / 5000) * 5000;
+        } else if (scaleRatioRaw < 150000) {
+          roundedScale = Math.round(scaleRatioRaw / 10000) * 10000;
+        } else if (scaleRatioRaw < 350000) {
+          roundedScale = Math.round(scaleRatioRaw / 25000) * 25000;
+        } else if (scaleRatioRaw < 750000) {
+          roundedScale = Math.round(scaleRatioRaw / 50000) * 50000;
+        } else {
+          roundedScale = Math.round(scaleRatioRaw / 100000) * 100000;
+        }
+        if (roundedScale < 50) roundedScale = 50;
+
+        const formattedScale = `1:${roundedScale.toLocaleString("id-ID")}`;
+        setPrintScaleText(formattedScale);
+
+        // 2. Calculate automatic Scale Bar
+        const mapWidthKm = calculateHaversineDistance([bounds.getWest(), lat], [bounds.getEast(), lat]);
+        // ideal scale bar representation is ~20% of the map width
+        const idealBarKm = mapWidthKm * 0.2;
+        let scaleBarText = "3 km";
+        if (idealBarKm < 0.1) {
+          const meters = Math.round((idealBarKm * 1000) / 10) * 10;
+          scaleBarText = `${meters || 50} m`;
+        } else if (idealBarKm < 0.25) {
+          scaleBarText = "100 m";
+        } else if (idealBarKm < 0.75) {
+          scaleBarText = "500 m";
+        } else if (idealBarKm < 1.5) {
+          scaleBarText = "1 km";
+        } else if (idealBarKm < 3) {
+          scaleBarText = "2 km";
+        } else if (idealBarKm < 7.5) {
+          scaleBarText = "5 km";
+        } else if (idealBarKm < 15) {
+          scaleBarText = "10 km";
+        } else if (idealBarKm < 35) {
+          scaleBarText = "25 km";
+        } else if (idealBarKm < 75) {
+          scaleBarText = "50 km";
+        } else {
+          const roundedKm = Math.round(idealBarKm / 50) * 50;
+          scaleBarText = `${roundedKm || 100} km`;
+        }
+        setPrintScaleBarKm(scaleBarText);
+      }
+    } catch (e) {
+      console.error("Gagal mengambil bounds peta:", e);
+    }
+
     // Tunggu map selesai render sebelum menangkap canvas
     if (map.isStyleLoaded() && !map.isMoving()) {
       captureCanvas(map);
@@ -2797,6 +2949,1142 @@ export default function MapContainer({
       console.error("Gagal menangkap kanvas peta:", err);
       setCapturedMapUrl(null);
       setIsCapturing(false);
+    }
+  };
+
+  // Helper renderers for Print Templates
+  const renderNorthArrowIcon = () => {
+    return (
+      <svg
+        width="20px"
+        height="20px"
+        viewBox="0 0 100 100"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="currentColor"
+        className="shrink-0"
+      >
+        <path
+          d="M42.066 0v20h3.752V6.957L53.881 20h4.053V0h-3.752v13.355L45.996 0zm5.57 26.688l-25.77 69.949c-.823 2.238 1.658 4.248 3.677 2.978L50 84.195l24.455 15.42c2.02 1.273 4.504-.738 3.68-2.978l-25.79-70c-.472-1.096-1.283-1.632-2.384-1.635c-1.1-.003-2.017.856-2.324 1.686zm-.136 14.83V79.86L29.1 91.463z"
+          fill="currentColor"
+          fillRule="evenodd"
+        ></path>
+      </svg>
+    );
+  };
+
+  const renderLegendItems = () => {
+    const activeLayers = layers.filter((l) => l.visible);
+    return (
+      <>
+        {activeLayers.map((l) => (
+          <div key={l.id} className="flex items-center gap-1.5 text-[8px]">
+            {l.type === "fill" && (
+              <div
+                className="w-3 h-2 border border-black shrink-0"
+                style={{ backgroundColor: l.color || "#94a3b8" }}
+              />
+            )}
+            {l.type === "line" && (
+              <div
+                className="w-3 h-0.5 shrink-0"
+                style={{ backgroundColor: l.color || "#ef4444" }}
+              />
+            )}
+            {l.type === "circle" && (
+              <div
+                className="w-2 h-2 rounded-full border border-black shrink-0"
+                style={{ backgroundColor: l.color || "#3b82f6" }}
+              />
+            )}
+            <span className="truncate font-mono leading-tight capitalize">
+              {printLayerLegendNames[l.id] !== undefined ? printLayerLegendNames[l.id] : l.name}
+            </span>
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  const renderLegendItemsInDark = () => {
+    const activeLayers = layers.filter((l) => l.visible);
+    return (
+      <>
+        {activeLayers.map((l) => (
+          <div key={l.id} className="flex items-center gap-1.5 text-[8px] text-slate-300">
+            {l.type === "fill" && (
+              <div
+                className="w-3 h-2 border border-slate-700 shrink-0"
+                style={{ backgroundColor: l.color || "#94a3b8" }}
+              />
+            )}
+            {l.type === "line" && (
+              <div
+                className="w-3 h-0.5 shrink-0"
+                style={{ backgroundColor: l.color || "#ef4444" }}
+              />
+            )}
+            {l.type === "circle" && (
+              <div
+                className="w-2 h-2 rounded-full border border-slate-700 shrink-0"
+                style={{ backgroundColor: l.color || "#3b82f6" }}
+              />
+            )}
+            <span className="truncate font-mono leading-tight capitalize">
+              {printLayerLegendNames[l.id] !== undefined ? printLayerLegendNames[l.id] : l.name}
+            </span>
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  const renderHorizontalLegendItems = () => {
+    const activeLayers = layers.filter((l) => l.visible);
+    return (
+      <div className="flex flex-row flex-wrap gap-x-2 gap-y-0.5 leading-none">
+        {activeLayers.map((l) => (
+          <div key={l.id} className="flex items-center gap-1">
+            {l.type === "fill" && (
+              <div
+                className="w-2.5 h-1.5 border border-black shrink-0"
+                style={{ backgroundColor: l.color || "#94a3b8" }}
+              />
+            )}
+            {l.type === "line" && (
+              <div
+                className="w-2.5 h-0.5 shrink-0"
+                style={{ backgroundColor: l.color || "#ef4444" }}
+              />
+            )}
+            {l.type === "circle" && (
+              <div
+                className="w-1.5 h-1.5 rounded-full border border-black shrink-0"
+                style={{ backgroundColor: l.color || "#3b82f6" }}
+              />
+            )}
+            <span className="capitalize leading-none text-[6px] md:text-[7px] font-mono">
+              {printLayerLegendNames[l.id] !== undefined ? printLayerLegendNames[l.id] : l.name}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderVintageLegendItems = () => {
+    const activeLayers = layers.filter((l) => l.visible);
+    return (
+      <>
+        {activeLayers.map((l) => (
+          <div key={l.id} className="flex items-center gap-1 text-[6px] md:text-[7px] text-[#4a3b32] leading-none">
+            {l.type === "fill" && (
+              <div
+                className="w-2 h-1.5 border border-[#4a3b32] shrink-0"
+                style={{ backgroundColor: l.color || "#94a3b8" }}
+              />
+            )}
+            {l.type === "line" && (
+              <div
+                className="w-2 h-0.5 shrink-0"
+                style={{ backgroundColor: l.color || "#ef4444" }}
+              />
+            )}
+            {l.type === "circle" && (
+              <div
+                className="w-1.5 h-1.5 rounded-full border border-[#4a3b32] shrink-0"
+                style={{ backgroundColor: l.color || "#3b82f6" }}
+              />
+            )}
+            <span className="capitalize leading-none font-serif text-[6px] md:text-[7px]">
+              {printLayerLegendNames[l.id] !== undefined ? printLayerLegendNames[l.id] : l.name}
+            </span>
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  const renderGridOverlay = () => {
+    // Falls back to Banda Aceh coordinates if bounds aren't captured yet
+    const bounds = printMapBounds || {
+      west: 95.25,
+      east: 95.40,
+      south: 5.50,
+      north: 5.62,
+    };
+
+    // Helper functions for UTM mapping
+    const latLonToUTM46N = (lat: number, lon: number) => {
+      const r = 6378137; // equatorial radius
+      const k0 = 0.9996; // scale factor
+      const lambda0 = (93 * Math.PI) / 180; // Central meridian UTM zone 46N is 93°E
+      const phi = (lat * Math.PI) / 180;
+      const lambda = (lon * Math.PI) / 180;
+
+      const x = r * k0 * (lambda - lambda0) * Math.cos(phi) + 500000;
+      const y = r * k0 * Math.log(Math.tan(Math.PI / 4 + phi / 2));
+      return { easting: Math.round(x), northing: Math.round(y) };
+    };
+
+    const formatDMS = (val: number, type: "lat" | "lon") => {
+      const absVal = Math.abs(val);
+      const d = Math.floor(absVal);
+      const m = Math.floor((absVal - d) * 60);
+      const s = Math.round((absVal - d - m / 60) * 3600);
+      const suffix = type === "lat" ? (val >= 0 ? "LU" : "LS") : (val >= 0 ? "BT" : "BB");
+      return `${d}°${m}'${s}" ${suffix}`;
+    };
+
+    const divisions = printGridInterval || 4;
+    const xLines: { percent: number; coord: number; label: string }[] = [];
+    const yLines: { percent: number; coord: number; label: string }[] = [];
+
+    // Horizontal & vertical internal divisions
+    for (let i = 1; i < divisions; i++) {
+      const percent = (i / divisions) * 100;
+
+      // Vertical line (X-axis, longitude increases West to East)
+      const lon = bounds.west + (bounds.east - bounds.west) * (i / divisions);
+      let xLabel = "";
+      if (printGridLabelFormat === "dms") {
+        xLabel = formatDMS(lon, "lon");
+      } else if (printGridLabelFormat === "decimal") {
+        xLabel = `${lon.toFixed(4)}° BT`;
+      } else {
+        // Average lat of map to minimize distortion
+        const utm = latLonToUTM46N((bounds.south + bounds.north) / 2, lon);
+        xLabel = `${utm.easting.toLocaleString("id-ID")} mE`;
+      }
+      xLines.push({ percent, coord: lon, label: xLabel });
+
+      // Horizontal line (Y-axis, latitude increases South to North, but CSS Y is top-to-bottom)
+      const lat = bounds.north - (bounds.north - bounds.south) * (i / divisions);
+      let yLabel = "";
+      if (printGridLabelFormat === "dms") {
+        yLabel = formatDMS(lat, "lat");
+      } else if (printGridLabelFormat === "decimal") {
+        yLabel = `${lat.toFixed(4)}° LU`;
+      } else {
+        const utm = latLonToUTM46N(lat, (bounds.west + bounds.east) / 2);
+        yLabel = `${utm.northing.toLocaleString("id-ID")} mN`;
+      }
+      yLines.push({ percent, coord: lat, label: yLabel });
+    }
+
+    return (
+      <div className="absolute inset-0 pointer-events-none select-none z-10 overflow-hidden">
+        {/* Draw Full Grid Lines */}
+        {printGridStyle === "line" && (
+          <>
+            {xLines.map((xl, idx) => (
+              <div
+                key={`v-line-${idx}`}
+                className="absolute top-0 bottom-0 border-l"
+                style={{
+                  left: `${xl.percent}%`,
+                  borderColor: printGridColor,
+                  borderStyle: "dashed",
+                }}
+              />
+            ))}
+            {yLines.map((yl, idx) => (
+              <div
+                key={`h-line-${idx}`}
+                className="absolute left-0 right-0 border-t"
+                style={{
+                  top: `${yl.percent}%`,
+                  borderColor: printGridColor,
+                  borderStyle: "dashed",
+                }}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Draw Intersection Crosshairs */}
+        {printGridStyle === "cross" &&
+          xLines.map((xl) =>
+            yLines.map((yl, idx) => (
+              <div
+                key={`cross-${xl.percent}-${yl.percent}-${idx}`}
+                className="absolute font-mono text-[9px] flex items-center justify-center"
+                style={{
+                  left: `${xl.percent}%`,
+                  top: `${yl.percent}%`,
+                  transform: "translate(-50%, -50%)",
+                }}
+              >
+                <div className="relative w-4 h-4 flex items-center justify-center">
+                  <div
+                    className="absolute w-3.5 h-[1.5px]"
+                    style={{ backgroundColor: printGridColor }}
+                  />
+                  <div
+                    className="absolute h-3.5 w-[1.5px]"
+                    style={{ backgroundColor: printGridColor }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+
+        {/* Draw Outer Edge Ticks (Ticks style) */}
+        {printGridStyle === "tick" && (
+          <>
+            {xLines.map((xl, idx) => (
+              <React.Fragment key={`v-tick-${idx}`}>
+                {/* Top Tick */}
+                <div
+                  className="absolute top-0 h-2.5 w-[1.5px]"
+                  style={{ left: `${xl.percent}%`, backgroundColor: printGridColor }}
+                />
+                {/* Bottom Tick */}
+                <div
+                  className="absolute bottom-0 h-2.5 w-[1.5px]"
+                  style={{ left: `${xl.percent}%`, backgroundColor: printGridColor }}
+                />
+              </React.Fragment>
+            ))}
+            {yLines.map((yl, idx) => (
+              <React.Fragment key={`h-tick-${idx}`}>
+                {/* Left Tick */}
+                <div
+                  className="absolute left-0 w-2.5 h-[1.5px]"
+                  style={{ top: `${yl.percent}%`, backgroundColor: printGridColor }}
+                />
+                {/* Right Tick */}
+                <div
+                  className="absolute right-0 w-2.5 h-[1.5px]"
+                  style={{ top: `${yl.percent}%`, backgroundColor: printGridColor }}
+                />
+              </React.Fragment>
+            ))}
+          </>
+        )}
+
+        {/* Coordinate Labels around borders */}
+        {/* Top border labels */}
+        {xLines.map((xl, idx) => (
+          <div
+            key={`lbl-top-${idx}`}
+            className="absolute top-1.5"
+            style={{
+              left: `${xl.percent}%`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <span
+              className="px-1 py-0.5 rounded font-mono font-bold leading-none select-none text-slate-800 bg-white/85 shadow-sm border border-slate-200/50"
+              style={{ fontSize: `${printGridLabelSize}px` }}
+            >
+              {xl.label}
+            </span>
+          </div>
+        ))}
+
+        {/* Bottom border labels */}
+        {xLines.map((xl, idx) => (
+          <div
+            key={`lbl-bot-${idx}`}
+            className="absolute bottom-1.5"
+            style={{
+              left: `${xl.percent}%`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <span
+              className="px-1 py-0.5 rounded font-mono font-bold leading-none select-none text-slate-800 bg-white/85 shadow-sm border border-slate-200/50"
+              style={{ fontSize: `${printGridLabelSize}px` }}
+            >
+              {xl.label}
+            </span>
+          </div>
+        ))}
+
+        {/* Left border labels */}
+        {yLines.map((yl, idx) => (
+          <div
+            key={`lbl-left-${idx}`}
+            className="absolute left-1.5"
+            style={{
+              top: `${yl.percent}%`,
+              transform: "translateY(-50%)",
+            }}
+          >
+            <span
+              className="px-1 py-0.5 rounded font-mono font-bold leading-none select-none text-slate-800 bg-white/85 shadow-sm border border-slate-200/50"
+              style={{ fontSize: `${printGridLabelSize}px` }}
+            >
+              {yl.label}
+            </span>
+          </div>
+        ))}
+
+        {/* Right border labels */}
+        {yLines.map((yl, idx) => (
+          <div
+            key={`lbl-right-${idx}`}
+            className="absolute right-1.5"
+            style={{
+              top: `${yl.percent}%`,
+              transform: "translateY(-50%)",
+            }}
+          >
+            <span
+              className="px-1 py-0.5 rounded font-mono font-bold leading-none select-none text-slate-800 bg-white/85 shadow-sm border border-slate-200/50"
+              style={{ fontSize: `${printGridLabelSize}px` }}
+            >
+              {yl.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderMapImage = (customClass = "") => {
+    if (capturedMapUrl) {
+      return (
+        <div className="absolute inset-0 w-full h-full">
+          <img
+            src={capturedMapUrl}
+            alt="Peta Spasial"
+            className={`w-full h-full object-cover ${customClass}`}
+            onError={() => {
+              console.error("Gagal memuat gambar peta yang ditangkap");
+              setCapturedMapUrl(null);
+            }}
+          />
+          {printShowGrid && renderGridOverlay()}
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+        <div className="w-12 h-12 border-4 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+        <span className="text-sm font-mono font-bold text-slate-500">
+          {isCapturing
+            ? "Mengambil gambar peta..."
+            : "Gagal menangkap peta. Silakan tutup dan coba lagi."}
+        </span>
+      </div>
+    );
+  };
+
+  const renderLayoutElements = () => {
+    return printLayoutElements.map((el) => {
+      const isSelected = el.id === selectedElementId;
+
+      return (
+        <div
+          key={el.id}
+          onMouseDown={(e) => startDrag(e, el.id)}
+          onTouchStart={(e) => startTouchDrag(e, el.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedElementId(el.id);
+          }}
+          className={`absolute select-none cursor-move group transition-all duration-75 ${
+            isSelected
+              ? "ring-2 ring-sky-400 ring-offset-1 print:ring-0 print:ring-offset-0 z-50"
+              : "hover:ring-1 hover:ring-slate-400 z-40"
+          }`}
+          style={{
+            left: `${el.x}%`,
+            top: `${el.y}%`,
+            transform: "translate(-50%, -50%)",
+            padding: "4px",
+            borderRadius: "2px",
+          }}
+        >
+          {/* Selector badge */}
+          {isSelected && (
+            <div className="absolute -top-2.5 -right-2.5 w-4 h-4 bg-sky-500 rounded-full border border-white flex items-center justify-center text-[8px] font-bold text-white print:hidden shadow-md">
+              ✓
+            </div>
+          )}
+
+          {el.type === "text" && (
+            <div
+              style={{
+                fontSize: `${el.fontSize || 14}px`,
+                color: el.fontColor || "#000000",
+                fontWeight: "bold",
+                whiteSpace: "nowrap",
+                fontFamily: "var(--font-sans)",
+                transform: `rotate(${el.rotation || 0}deg)`,
+                transformOrigin: "center",
+              }}
+            >
+              {el.content}
+            </div>
+          )}
+
+          {el.type === "line" && (
+            <div
+              style={{
+                width: `${el.width || 100}px`,
+                height: `${el.lineWidth || 2}px`,
+                backgroundColor: el.lineColor || "#ff0000",
+                transform: `rotate(${el.rotation || 0}deg)`,
+                transformOrigin: "center",
+              }}
+            />
+          )}
+
+          {el.type === "rectangle" && (
+            <div
+              style={{
+                width: `${el.width || 120}px`,
+                height: `${el.height || 60}px`,
+                backgroundColor:
+                  el.rectFillColor || "rgba(255,255,255,0.7)",
+                border: `${el.rectBorderWidth === undefined ? 2 : el.rectBorderWidth}px solid ${el.rectBorderColor || "#000000"}`,
+                transform: `rotate(${el.rotation || 0}deg)`,
+                transformOrigin: "center",
+              }}
+            />
+          )}
+
+          {el.type === "image" && el.imageUrl && (
+            <img
+              src={el.imageUrl}
+              alt="Overlay element"
+              referrerPolicy="no-referrer"
+              style={{
+                width: `${el.width || 60}px`,
+                height: `${el.height || 60}px`,
+                transform: `rotate(${el.rotation || 0}deg)`,
+                transformOrigin: "center",
+                objectFit: "contain",
+              }}
+            />
+          )}
+        </div>
+      );
+    });
+  };
+
+  const renderTemplateContent = () => {
+    switch (printTemplate) {
+      case "classic_editorial":
+        return (
+          <div className="flex flex-col w-full h-full p-4 justify-between bg-white text-black font-sans leading-normal">
+            {/* Top Header */}
+            <div className="text-center border-b-2 border-slate-800 pb-2 mb-2">
+              <h1 className="text-sm md:text-base font-extrabold tracking-tight uppercase leading-tight font-sans">
+                {printTitle || "PETA SPASIAL EDITORIAL"}
+              </h1>
+              <p className="text-[8px] md:text-[9px] font-medium text-slate-700 mt-0.5">
+                {printSubtitle || "Subjudul deskriptif · Tahun 2026 · Lokasi Analisis"}
+              </p>
+            </div>
+
+            {/* Middle Area */}
+            <div className="flex-1 flex flex-row gap-3 min-h-0 overflow-hidden">
+              {/* Left Sidebar (Legenda & Inset) */}
+              <div className="w-[160px] md:w-[180px] border border-slate-400 p-2 flex flex-col justify-between shrink-0 bg-slate-50/50">
+                {/* Legend */}
+                <div className="flex flex-col min-h-0">
+                  <h3 className="text-[8px] font-bold uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5 mb-1 text-slate-800">
+                    ■ {printLegendTitle}
+                  </h3>
+                  <div className="flex flex-col gap-1 overflow-y-auto max-h-48 pr-1 text-[8px] font-mono">
+                    {renderLegendItems()}
+                  </div>
+                </div>
+
+                {/* Inset Placeholder / Mini Info */}
+                <div className="border border-dashed border-slate-400 p-1.5 rounded bg-white mt-2">
+                  <h4 className="text-[7px] font-bold uppercase font-mono mb-0.5 text-center text-slate-700">
+                    {tempInsetTitle}
+                  </h4>
+                  <div className="h-12 bg-slate-200 border border-slate-300 flex items-center justify-center rounded text-[6px] text-slate-500 text-center font-mono p-1 leading-tight">
+                    {tempInsetDescription}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Main Map Frame */}
+              <div className="flex-1 border border-slate-400 relative flex items-center justify-center overflow-hidden bg-slate-100">
+                {renderMapImage()}
+                {renderLayoutElements()}
+              </div>
+            </div>
+
+            {/* Bottom Bar */}
+            <div className="border-t border-slate-400 pt-2 mt-2 flex justify-between items-center text-[7px] font-mono text-slate-600">
+              <div>
+                <span className="font-bold">Skala:</span> {printScaleText || "1:25.000"} | <span className="font-bold">Skala Bar:</span> {printScaleBarKm}
+                <div className="mt-0.5">{printSourceText || "Sumber: Bappeda Banda Aceh"}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {printShowCompass && renderNorthArrowIcon()}
+                <div className="text-right leading-tight">
+                  <span className="font-bold">Proyeksi:</span> {printProjection}
+                  <div className="text-[6px]">Kartografer: {printCartographer}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "magazine_spread":
+        return (
+          <div className="flex flex-col w-full h-full p-4 justify-between bg-zinc-50 text-zinc-900 font-sans leading-normal">
+            {/* Header bar */}
+            <div className="flex justify-between items-center border-b border-zinc-300 pb-1 mb-2 text-xs font-mono">
+              <div className="flex items-center gap-1.5">
+                {printLogo ? (
+                  <img src={printLogo} className="w-5 h-5 object-contain" />
+                ) : (
+                  <span className="font-bold text-[8px] bg-zinc-900 text-white px-1 py-0.5 rounded leading-none">MAG</span>
+                )}
+                <span className="text-[8px] text-zinc-500 font-bold tracking-wider">{tempMagLabel}</span>
+              </div>
+              <h2 className="text-[10px] md:text-xs font-extrabold tracking-widest uppercase text-zinc-900 font-sans">
+                {printTitle || "JUDUL FEATURE MAGAZINE"}
+              </h2>
+              <span className="text-[8px] text-zinc-400 font-bold">{tempMagPage}</span>
+            </div>
+
+            {/* Main Full-Width Map Frame */}
+            <div className="flex-1 border border-zinc-300 relative flex items-center justify-center overflow-hidden bg-white shadow-sm">
+              {renderMapImage()}
+              {renderLayoutElements()}
+            </div>
+
+            {/* Bottom horizontal bar */}
+            <div className="border-t border-zinc-300 pt-1.5 mt-2 flex justify-between items-center gap-2 text-[7px] font-mono text-zinc-600">
+              {/* Horizontal legend */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-zinc-800">{printLegendTitle}:</span>
+                {renderHorizontalLegendItems()}
+              </div>
+              
+              <div className="flex items-center gap-3 shrink-0 leading-tight">
+                <div>Skala: {printScaleText || "1:25.000"} ({printScaleBarKm})</div>
+                {printShowCompass && renderNorthArrowIcon()}
+                <div className="text-zinc-400">© 2026 · {printCartographer}</div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "academic_paper":
+        return (
+          <div className="flex flex-col w-full h-full p-5 justify-between bg-white text-black font-serif leading-normal">
+            {/* Figure Caption at top */}
+            <div className="border-b border-black pb-1.5 mb-2 text-center">
+              <h2 className="text-xs font-bold tracking-tight leading-snug font-serif">
+                {tempAcademicFigure} {printTitle || "Geospatial Analysis Data"}
+              </h2>
+              <p className="text-[8px] font-sans text-slate-500 mt-0.5 italic">
+                {printSubtitle || "A high-fidelity scholarly mapping and visualization report."}
+              </p>
+            </div>
+
+            {/* Main Map frame */}
+            <div className="flex-1 border border-black relative flex items-center justify-center overflow-hidden bg-slate-50">
+              {renderMapImage()}
+              {renderLayoutElements()}
+            </div>
+
+            {/* Metadata / Details Panel */}
+            <div className="grid grid-cols-3 gap-3 pt-2 mt-2 border-t border-black text-[7px] font-sans leading-normal">
+              {/* Col 1: Academic Legend */}
+              <div className="flex flex-col border-r border-slate-300 pr-1.5">
+                <span className="font-bold uppercase tracking-wider text-[6px] text-slate-600 mb-0.5">■ {printLegendTitle}</span>
+                <div className="flex flex-col gap-1 overflow-y-auto max-h-16 text-[7px] font-mono">
+                  {renderLegendItems()}
+                </div>
+              </div>
+
+              {/* Col 2: Spatial Metadata */}
+              <div className="flex flex-col border-r border-slate-300 pr-1.5 leading-tight">
+                <span className="font-bold uppercase tracking-wider text-[6px] text-slate-600 mb-0.5">■ METADATA</span>
+                <div><span className="font-medium text-slate-500">Source:</span> {printSourceText || "Academic Survey Base, 2026"}</div>
+                <div className="mt-0.5"><span className="font-medium text-slate-500">Projection:</span> {printProjection}</div>
+                <div className="mt-0.5"><span className="font-medium text-slate-500">Datum:</span> {printDatum}</div>
+              </div>
+
+              {/* Col 3: Cartographer & Scale */}
+              <div className="flex flex-col justify-between items-end text-right leading-tight">
+                <div className="flex items-center gap-1.5">
+                  {printShowCompass && renderNorthArrowIcon()}
+                  <div>
+                    <div className="font-bold text-[8px] text-slate-800">Scale: {printScaleText || "1:25.000"}</div>
+                    <div className="text-[6px] text-slate-500">Scale Bar: {printScaleBarKm}</div>
+                  </div>
+                </div>
+                <div className="text-[6px] mt-2 font-mono text-slate-500">
+                  Cartographer: {printCartographer} <br/>
+                  {tempAcademicSubmitted}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "corporate_dashboard":
+        return (
+          <div className="flex flex-col w-full h-full p-4 justify-between bg-slate-950 text-slate-100 font-sans leading-normal">
+            {/* Dark corporate header */}
+            <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-2 rounded mb-2 text-[9px] font-mono">
+              <div className="flex items-center gap-2">
+                {printLogo ? (
+                  <img src={printLogo} className="w-5 h-5 object-contain rounded border border-slate-700" />
+                ) : (
+                  <div className="w-5 h-5 bg-blue-500 text-slate-950 flex items-center justify-center font-bold text-[10px] rounded leading-none">C</div>
+                )}
+                <div className="leading-tight">
+                  <h1 className="font-bold text-slate-200 uppercase leading-none text-[8px] md:text-[9px]">{printTitle || "DASHBOARD SPASIAL KORPORAT"}</h1>
+                  <span className="text-[7px] text-slate-400 mt-0.5 block">{printSubtitle || "Laporan Analisis Wilayah"}</span>
+                </div>
+              </div>
+              <div className="text-right text-[7px] text-slate-400 leading-tight">
+                <div>Klien: {tempCorpClient}</div>
+                <div>Tanggal: {new Date().toLocaleDateString("id-ID")}</div>
+              </div>
+            </div>
+
+            {/* Map Frame */}
+            <div className="flex-1 border border-slate-800 rounded relative flex items-center justify-center overflow-hidden bg-slate-900">
+              {renderMapImage()}
+              {renderLayoutElements()}
+            </div>
+
+            {/* KPI / Stats & Charts Area */}
+            <div className="grid grid-cols-3 gap-2.5 my-1.5 text-[8px] font-sans">
+              {/* Legend */}
+              <div className="bg-slate-900 border border-slate-800 p-2 rounded flex flex-col justify-between">
+                <div>
+                  <span className="block text-[7px] font-bold text-blue-400 tracking-wider uppercase mb-1 font-mono">■ {printLegendTitle}</span>
+                  <div className="flex flex-col gap-1 overflow-y-auto max-h-16 text-[7px] font-mono">
+                    {renderLegendItemsInDark()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart 1: Visual Pie/Bar mock */}
+              <div className="bg-slate-900 border border-slate-800 p-2 rounded flex flex-col justify-between">
+                <div>
+                  <span className="block text-[7px] font-bold text-blue-400 tracking-wider uppercase mb-1 font-mono">📊 DISTRIBUSI AREA</span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <div className="flex-1 flex flex-col gap-1">
+                      {tempCorpMetrics.map((met, idx) => (
+                        <div key={idx} className="flex items-center gap-1 text-[7px] font-mono">
+                          <span className="w-12 truncate text-slate-400 leading-none">{met.name}</span>
+                          <div className="flex-1 bg-slate-800 h-1.5 rounded overflow-hidden">
+                            <div 
+                              className={`h-full ${idx % 2 === 0 ? "bg-blue-500" : "bg-indigo-500"}`} 
+                              style={{ width: `${met.value}%` }} 
+                            />
+                          </div>
+                          <span className="text-slate-300 leading-none">{met.value}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart 2: KPI Metrics */}
+              <div className="bg-slate-900 border border-slate-800 p-2 rounded flex flex-col justify-between font-mono">
+                <div>
+                  <span className="block text-[7px] font-bold text-blue-400 tracking-wider uppercase mb-1">📈 KPI STATS</span>
+                  <div className={`grid ${tempCorpKPIs.length <= 2 ? "grid-cols-2" : tempCorpKPIs.length === 3 ? "grid-cols-3" : "grid-cols-2"} gap-1 text-center font-mono`}>
+                    {tempCorpKPIs.map((kpi, idx) => (
+                      <div key={idx} className="bg-slate-950 p-1 rounded border border-slate-800 leading-none">
+                        <div className={`text-[8px] font-bold ${idx % 2 === 0 ? "text-blue-400" : "text-emerald-400"}`}>{kpi.value}</div>
+                        <div className="text-[5px] text-slate-500 uppercase mt-0.5 truncate">{kpi.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer details */}
+            <div className="border-t border-slate-800 pt-1 flex justify-between items-center text-[7px] font-mono text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>Skala: {printScaleText || "1:25.000"}</span>
+                <span>•</span>
+                <span>Proyeksi: {printProjection}</span>
+              </div>
+              <span>Dipersiapkan oleh: {printCartographer} | Rahasia Korporat © 2026</span>
+            </div>
+          </div>
+        );
+
+      case "executive_brief":
+        return (
+          <div className="flex flex-col w-full h-full p-4 justify-between bg-white text-slate-900 font-sans leading-normal">
+            {/* Elegant minimalist header */}
+            <div className="border-b-2 border-slate-900 pb-1.5 mb-2.5">
+              <span className="text-[7px] md:text-[8px] font-bold text-slate-500 tracking-widest uppercase block font-mono leading-none">{tempExecLabel}</span>
+              <h1 className="text-xs md:text-sm font-black text-slate-900 leading-tight tracking-tight uppercase mt-0.5">
+                {printTitle || "DOKUMEN ANALISIS EKSEKUTIF"}
+              </h1>
+              <p className="text-[8px] text-slate-600 font-mono mt-0.5 italic">
+                {printSubtitle || "Laporan ringkas pengambil keputusan tingkat tinggi."}
+              </p>
+            </div>
+
+            {/* Main split area */}
+            <div className="flex-1 flex flex-row gap-3 min-h-0 overflow-hidden">
+              {/* Map Box */}
+              <div className="flex-[2] border border-slate-300 relative flex items-center justify-center overflow-hidden bg-slate-50 rounded shadow-sm">
+                {renderMapImage()}
+                {renderLayoutElements()}
+              </div>
+
+              {/* Key Insights Box */}
+              <div className="w-[140px] md:w-[160px] bg-slate-50 border border-slate-200 p-2.5 rounded flex flex-col justify-between shrink-0 font-sans">
+                <div className="flex flex-col gap-1.5 leading-relaxed">
+                  <h3 className="text-[8px] font-bold text-slate-800 uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5 mb-0.5">
+                    💡 KEY INSIGHTS
+                  </h3>
+                  <ul className="text-[7px] text-slate-600 list-disc pl-3 space-y-1.5 max-h-32 overflow-y-auto">
+                    {tempExecInsights.map((insight, idx) => {
+                      const parts = insight.split(":");
+                      if (parts.length > 1) {
+                        return (
+                          <li key={idx}>
+                            <strong>{parts[0]}:</strong>{parts.slice(1).join(":")}
+                          </li>
+                        );
+                      }
+                      return <li key={idx}>{insight}</li>;
+                    })}
+                  </ul>
+                </div>
+
+                {/* Mini Legend */}
+                <div className="border-t border-slate-200 pt-1.5 mt-1.5">
+                  <span className="block text-[6px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">Legenda Singkat:</span>
+                  <div className="flex flex-col gap-1 text-[7px] max-h-16 overflow-y-auto pr-1">
+                    {renderLegendItems()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Minimalist footer bar */}
+            <div className="border-t border-slate-300 pt-1.5 mt-2 flex justify-between items-center text-[7px] font-mono text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>Skala: {printScaleText || "1:25.000"}</span>
+                <span>•</span>
+                <span>Sumber: {printSourceText || "Bappeda Banda Aceh"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {printShowCompass && renderNorthArrowIcon()}
+                <span>Dibuat: {printCartographer} | Confidential © 2026</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "government_report":
+        return (
+          <div className="flex flex-col w-full h-full p-4 justify-between bg-white text-black font-sans leading-normal">
+            {/* Official Government Header (Kop Resmi) */}
+            <div className="border-b-4 border-double border-black pb-2 mb-2 flex items-center gap-2 text-left">
+              {printLogo ? (
+                <img src={printLogo} className="w-9 h-9 object-contain border border-black rounded p-0.5" />
+              ) : (
+                <div className="w-8 h-8 border border-black flex items-center justify-center font-serif font-black text-xs bg-slate-50 shrink-0">
+                  🇮🇩
+                </div>
+              )}
+              <div className="flex-1 leading-snug">
+                <h3 className="font-extrabold text-[8px] tracking-wider uppercase font-mono leading-none">
+                  {printGovernmentName || "KEMENTERIAN AGRARIA DAN TATA RUANG / BPN"}
+                </h3>
+                <h2 className="font-black text-[9px] md:text-[10px] tracking-wide uppercase mt-0.5 leading-tight font-sans">
+                  {printRegionName || "DINAS PEKERJAAN UMUM DAN PENATAAN RUANG"}
+                </h2>
+                <p className="text-[7px] text-slate-600 font-medium font-mono leading-none mt-0.5">
+                  {printProvinceName || "PEMERINTAH PROVINSI ACEH"} · KOTA BANDA ACEH
+                </p>
+              </div>
+              <div className="text-right font-mono text-[6px] border-l border-slate-300 pl-1.5 leading-tight">
+                <div>No. Lembar: {tempGovSheet}</div>
+                <div>Edisi: {tempGovEdition}</div>
+              </div>
+            </div>
+
+            {/* Map Title inside government report */}
+            <div className="text-center bg-slate-100 border border-black py-1 mb-2">
+              <h1 className="font-black text-[9px] md:text-[10px] tracking-wider uppercase leading-none">
+                {printTitle || "PETA RENCANA TATA RUANG WILAYAH (RTRW)"}
+              </h1>
+            </div>
+
+            {/* Middle Content */}
+            <div className="flex-1 flex flex-row gap-2.5 min-h-0 overflow-hidden">
+              {/* Left Column: Legend */}
+              <div className="w-[140px] md:w-[160px] border border-black p-1.5 bg-white flex flex-col justify-between shrink-0">
+                <div className="flex flex-col min-h-0">
+                  <h4 className="font-black text-[8px] uppercase border-b border-black pb-0.5 mb-1 text-center font-serif">
+                    {printLegendTitle}
+                  </h4>
+                  <div className="flex flex-col gap-1 overflow-y-auto max-h-48 pr-1 text-[7px] font-mono leading-none">
+                    {renderLegendItems()}
+                  </div>
+                </div>
+
+                {/* Small Index */}
+                <div className="border border-black p-1 bg-slate-50 mt-1 text-center font-mono leading-none">
+                  <span className="text-[6px] font-bold block mb-0.5">PETA INDEKS</span>
+                  <div className="h-10 bg-slate-200 border border-slate-300 rounded flex items-center justify-center text-[5px] text-slate-500">
+                    PROVINSI ACEH
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Main Map Frame */}
+              <div className="flex-1 border border-black relative flex items-center justify-center overflow-hidden bg-slate-50">
+                {renderMapImage()}
+                {renderLayoutElements()}
+              </div>
+            </div>
+
+            {/* Bottom official details bar */}
+            <div className="grid grid-cols-4 gap-1 border border-black p-1.5 mt-1.5 text-[6px] font-mono leading-tight bg-slate-50/50">
+              <div className="border-r border-slate-400 pr-1">
+                <span className="font-bold text-slate-800 block font-sans">SKALA UTAMA</span>
+                Skala: {printScaleText || "1:50.000"}<br/>
+                Int. Kontur: {tempGovContour}
+              </div>
+              <div className="border-r border-slate-400 px-1">
+                <span className="font-bold text-slate-800 block font-sans">KOORDINAT</span>
+                Proyeksi: {printProjection}<br/>
+                Grid: UTM &amp; Geo
+              </div>
+              <div className="border-r border-slate-400 px-1">
+                <span className="font-bold text-slate-800 block font-sans">RUJUKAN</span>
+                Datum: {printDatum || "WGS 84"}<br/>
+                Sumber: {printSourceText ? printSourceText.substring(0, 30) + "..." : "Bappeda"}
+              </div>
+              <div className="pl-1 text-right flex flex-col justify-between">
+                <div>
+                  <span className="font-bold text-slate-800 block font-sans">KARTOGRAFER</span>
+                  NIP: 199208042018011002<br/>
+                  Nama: {printCartographer}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "storytelling_poster":
+        return (
+          <div className="flex flex-col w-full h-full p-4 justify-between bg-zinc-950 text-zinc-100 font-sans leading-normal">
+            {/* Dramatic Poster Title */}
+            <div className="text-center py-1 mb-1.5">
+              <h1 className="text-sm md:text-base font-black tracking-wider uppercase text-amber-400 font-mono">
+                {printTitle || "DRAMATIS: EKSPLORASI SPASIAL"}
+              </h1>
+              <p className="text-[8px] md:text-[9px] text-zinc-400 mt-0.5 italic font-serif">
+                "{printSubtitle || "Menghubungkan data geografis dengan realita kehidupan bermasyarakat."}"
+              </p>
+            </div>
+
+            {/* Main Vertically Oriented Map Frame */}
+            <div className="flex-1 border-2 border-zinc-700 relative flex items-center justify-center overflow-hidden bg-zinc-900 rounded shadow-2xl">
+              {renderMapImage()}
+              {renderLayoutElements()}
+            </div>
+
+            {/* Narrative & Info Block */}
+            <div className="pt-2 mt-2 border-t border-zinc-800 grid grid-cols-3 gap-3 text-xs">
+              {/* Narrative Column */}
+              <div className="col-span-2 leading-relaxed text-[8px] text-zinc-300 font-serif pr-1">
+                <p>
+                  {tempPosterNarrative}
+                </p>
+              </div>
+
+              {/* Mini Minimal Legend Column */}
+              <div className="flex flex-col justify-between text-[6px] font-mono text-zinc-500 border-l border-zinc-800 pl-2 font-mono">
+                <div>
+                  <span className="text-[7px] font-bold text-amber-500 block mb-0.5">{printLegendTitle}</span>
+                  <div className="flex flex-col gap-0.5 overflow-y-auto max-h-12 font-mono">
+                    {renderLegendItemsInDark()}
+                  </div>
+                </div>
+                <div className="text-right text-[5px] mt-1 font-mono">
+                  Skala: {printScaleText || "1:25.000"} ({printScaleBarKm}) <br/>
+                  Dibuat: {printCartographer}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "infographic_map":
+        return (
+          <div className="flex flex-col w-full h-full p-4 justify-between bg-amber-50 text-slate-900 font-sans leading-normal">
+            {/* Infographic Header */}
+            <div className="flex justify-between items-center border-b border-amber-200 pb-1 mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 bg-amber-500 text-white rounded flex items-center justify-center shadow">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h1 className="font-black text-[9px] md:text-[10px] text-amber-950 uppercase tracking-tight leading-none font-sans">
+                    {printTitle || "INFOGRAFIS GEOSPASIAL INTERAKTIF"}
+                  </h1>
+                  <p className="text-[7px] text-amber-800 font-medium leading-none mt-0.5 font-mono">
+                    {printSubtitle || "Analisis spasial multivariat & distribusi wilayah."}
+                  </p>
+                </div>
+              </div>
+              <span className="text-[6px] font-bold font-mono text-amber-800 bg-amber-200/50 px-1.5 py-0.5 rounded-full">
+                EDISI KHUSUS 2026
+              </span>
+            </div>
+
+            {/* Stat row with big numbers */}
+            <div className={`grid ${tempInfoMetrics.length === 3 ? "grid-cols-3" : tempInfoMetrics.length === 4 ? "grid-cols-4" : tempInfoMetrics.length > 4 ? "grid-cols-5" : "grid-cols-2"} gap-1.5 mb-1.5`}>
+              {tempInfoMetrics.map((met, idx) => {
+                const colors = ["text-amber-600", "text-indigo-600", "text-emerald-600", "text-rose-600", "text-sky-600"];
+                const colorClass = colors[idx % colors.length];
+                return (
+                  <div key={idx} className="bg-white border border-amber-200/80 p-1 rounded text-center shadow-sm leading-none">
+                    <span className={`text-[10px] md:text-xs font-black ${colorClass} block leading-none font-sans`}>{met.value}</span>
+                    <span className="text-[5px] text-slate-500 font-bold uppercase font-mono tracking-tight leading-none mt-0.5 block truncate">{met.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Map Frame */}
+            <div className="flex-1 border border-amber-200 relative flex items-center justify-center overflow-hidden bg-white shadow-inner rounded">
+              {renderMapImage()}
+              {renderLayoutElements()}
+            </div>
+
+            {/* Callout boxes below map */}
+            <div className={`grid ${tempInfoCallouts.length === 2 ? "grid-cols-2" : tempInfoCallouts.length >= 3 ? "grid-cols-3" : "grid-cols-1"} gap-1.5 mt-1.5 mb-1.5 text-[6px] md:text-[7px]`}>
+              {tempInfoCallouts.map((call, idx) => {
+                const icons = [
+                  <ShieldAlert className="w-2.5 h-2.5 text-rose-500 shrink-0 mt-0.5" />,
+                  <TrendingUp className="w-2.5 h-2.5 text-emerald-600 shrink-0 mt-0.5" />,
+                  <MapPin className="w-2.5 h-2.5 text-indigo-500 shrink-0 mt-0.5" />
+                ];
+                const icon = icons[idx % icons.length] || <Sparkles className="w-2.5 h-2.5 text-amber-500 shrink-0 mt-0.5" />;
+                return (
+                  <div key={idx} className="bg-amber-100/50 border border-amber-200 p-1 rounded flex gap-1 items-start">
+                    {icon}
+                    <div className="leading-tight">
+                      <span className="font-bold text-amber-950 block font-sans">{call.title}</span>
+                      <p className="text-[5px] text-slate-600 leading-none mt-0.5">{call.text}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-amber-200 pt-1 flex justify-between items-center text-[7px] font-mono text-amber-800">
+              <div className="flex items-center gap-2">
+                <span>Skala: {printScaleText || "1:25.000"}</span>
+                <div className="flex items-center gap-1">
+                  <span>{printLegendTitle}:</span>
+                  {renderHorizontalLegendItems()}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 leading-tight">
+                {printShowCompass && renderNorthArrowIcon()}
+                <span>Dibuat: {printCartographer} · Sumber: {printSourceText ? printSourceText.substring(0, 15) + "..." : "Analisis"}</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "vintage_heritage":
+        return (
+          <div className="flex flex-col w-full h-full p-4 md:p-5 justify-between bg-[#f4ebd0] text-[#4a3b32] font-serif border-[10px] border-double border-[#4a3b32] relative select-none leading-normal">
+            {/* Ornamental Corners */}
+            <div className="absolute top-0.5 left-0.5 font-serif text-[10px] text-[#4a3b32] font-bold leading-none">✥</div>
+            <div className="absolute top-0.5 right-0.5 font-serif text-[10px] text-[#4a3b32] font-bold leading-none">✥</div>
+            <div className="absolute bottom-0.5 left-0.5 font-serif text-[10px] text-[#4a3b32] font-bold leading-none">✥</div>
+            <div className="absolute bottom-0.5 right-0.5 font-serif text-[10px] text-[#4a3b32] font-bold leading-none">✥</div>
+
+            {/* Ornamental Cartouche */}
+            <div className="border border-[#4a3b32] p-1 rounded bg-[#faf4e5] max-w-md mx-auto w-full text-center mb-2 shadow-sm relative">
+              <div className="border border-dashed border-[#4a3b32] p-1.5 flex flex-col items-center">
+                <span className="text-[6px] tracking-widest font-bold uppercase text-[#735d4d] leading-none mb-0.5">{tempVintageTop}</span>
+                <h1 className="text-[9px] md:text-[10px] font-black tracking-widest uppercase text-[#4a3b32] font-serif leading-tight font-serif">
+                  {printTitle || "TERRITORIUM BANDAE ACENSIS"}
+                </h1>
+                <div className="w-16 h-[1px] bg-[#4a3b32] my-0.5" />
+                <p className="text-[7px] italic text-[#735d4d] leading-snug">
+                  {printSubtitle || "Badan Perencanaan Pembangunan Daerah Kota Banda Aceh · Anno Domini MMXXVI"}
+                </p>
+              </div>
+            </div>
+
+            {/* Main Map Frame */}
+            <div className="flex-1 border-[3px] border-double border-[#4a3b32] relative flex items-center justify-center overflow-hidden bg-[#faf4e5]">
+              {renderMapImage("sepia-[0.35] contrast-[0.95] saturate-[0.85]")}
+              {renderLayoutElements()}
+              
+              {/* Compass Rose */}
+              {printShowCompass && (
+                <div className="absolute top-3 right-3 w-10 h-10 pointer-events-none select-none opacity-85 filter sepia brightness-[0.8] contrast-[1.2]">
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#4a3b32" strokeWidth="1" strokeDasharray="2,2" />
+                    <path d="M50,5 L50,95 M5,50 L95,50 M18,18 L82,82 M18,82 L82,18" stroke="#4a3b32" strokeWidth="0.5" />
+                    <polygon points="50,50 50,15 46,50" fill="#4a3b32" />
+                    <polygon points="50,50 50,15 54,50" fill="#735d4d" />
+                    <polygon points="50,50 50,85 46,50" fill="#735d4d" />
+                    <polygon points="50,50 50,85 54,50" fill="#4a3b32" />
+                    
+                    <polygon points="50,50 15,50 50,46" fill="#735d4d" />
+                    <polygon points="50,50 15,50 50,54" fill="#4a3b32" />
+                    <polygon points="50,50 85,50 50,46" fill="#4a3b32" />
+                    <polygon points="50,50 85,50 50,54" fill="#735d4d" />
+                    <text x="50" y="10" textAnchor="middle" fontSize="12" fontFamily="serif" fontWeight="bold" fill="#4a3b32">N</text>
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Vintage Legend, Inset and Scale info */}
+            <div className="grid grid-cols-3 gap-3 pt-1.5 mt-2 border-t-2 border-double border-[#4a3b32] text-[7px] font-serif leading-tight">
+              {/* Vintage Legend */}
+              <div className="border-r border-[#4a3b32]/40 pr-1.5">
+                <span className="font-bold text-[8px] uppercase tracking-wider block mb-0.5 text-center font-serif leading-none">✥ {printLegendTitle}</span>
+                <div className="flex flex-col gap-0.5 overflow-y-auto max-h-16 text-[7px] leading-tight font-serif">
+                  {renderVintageLegendItems()}
+                </div>
+              </div>
+
+              {/* Vintage Inset Info */}
+              <div className="border-r border-[#4a3b32]/40 pr-1.5 leading-tight font-serif">
+                <span className="font-bold text-[8px] uppercase tracking-wider block mb-0.5 text-center leading-none">✥ NOTANDUM SPATIALIS</span>
+                <div>Projection: {printProjection ? printProjection.substring(17) : "UTM 46N"}</div>
+                <div className="mt-0.5">Datum: {printDatum}</div>
+                <div className="mt-0.5">Scala: {printScaleText || "1:25.000"}</div>
+              </div>
+
+              {/* Vintage Scale bar and Cartographer */}
+              <div className="flex flex-col justify-between items-end text-right leading-tight font-serif">
+                <div className="text-[7px]">
+                  <strong>Scala Linearis:</strong> {printScaleBarKm || "3 km"}<br/>
+                  <strong>Auctore:</strong> {printCartographer}
+                </div>
+                <span className="text-[5px] italic mt-1 text-[#735d4d]">Printed Anno Domini MMXXVI</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
     }
   };
 
@@ -2889,8 +4177,20 @@ export default function MapContainer({
             html, body {
               margin: 0 !important;
               padding: 0 !important;
-              background-color: white !important;
-              color: black !important;
+              background-color: ${
+                printTemplate === "vintage_heritage"
+                  ? "#f4ebd0"
+                  : printTemplate === "corporate_dashboard" || printTemplate === "storytelling_poster"
+                  ? "#020617"
+                  : printTemplate === "infographic_map"
+                  ? "#fffbeb"
+                  : "white"
+              } !important;
+              color: ${
+                printTemplate === "corporate_dashboard" || printTemplate === "storytelling_poster"
+                  ? "#f1f5f9"
+                  : "black"
+              } !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
@@ -2902,8 +4202,22 @@ export default function MapContainer({
               box-sizing: border-box;
               margin: 0 auto;
               padding: 8mm;
-              background: white !important;
-              color: black !important;
+              background: ${
+                printTemplate === "vintage_heritage"
+                  ? "#f4ebd0"
+                  : printTemplate === "corporate_dashboard" || printTemplate === "storytelling_poster"
+                  ? "#020617"
+                  : printTemplate === "infographic_map"
+                  ? "#fffbeb"
+                  : printTemplate === "magazine_spread"
+                  ? "#fafafa"
+                  : "white"
+              } !important;
+              color: ${
+                printTemplate === "corporate_dashboard" || printTemplate === "storytelling_poster"
+                  ? "#f1f5f9"
+                  : "black"
+              } !important;
               overflow: hidden;
               position: relative;
             }
@@ -2913,15 +4227,12 @@ export default function MapContainer({
               height: 100% !important;
               max-height: none !important;
               max-width: none !important;
-              border: 4px double black !important;
               box-shadow: none !important;
               margin: 0 !important;
-              padding: 6px !important;
               box-sizing: border-box !important;
               display: flex !important;
-              flex-direction: ${isPortrait ? "column" : "row"} !important;
-              background: white !important;
-              color: black !important;
+              flex-direction: ${printTemplate === "default" ? (isPortrait ? "column" : "row") : "column"} !important;
+              ${printTemplate === "default" ? "border: 4px double black !important; background: white !important; color: black !important; padding: 6px !important;" : ""}
             }
             .print\\:hidden {
               display: none !important;
@@ -3088,9 +4399,18 @@ export default function MapContainer({
           showMiniMap ? "hidden md:block" : "hidden"
         }`}
       >
-        <div className="absolute top-0 left-0 right-0 bg-[#0f172a]/95 text-[9px] font-mono font-bold tracking-widest text-slate-300 py-1.5 px-2.5 z-40 border-b border-[#334155] flex items-center justify-between">
+        <div className="absolute top-0 left-0 right-0 bg-[#0f172a]/95 text-[9px] font-mono font-bold tracking-widest text-slate-300 py-1 px-2.5 z-40 border-b border-[#334155] flex items-center justify-between">
           <span>MINI MAP OVERVIEW</span>
-          <span className="w-1.5 h-1.5 bg-[#38bdf8] rounded-full animate-ping"></span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMiniMap(false);
+            }}
+            className="p-1 hover:bg-[#1e293b] text-slate-400 hover:text-red-400 rounded transition-all cursor-pointer"
+            title="Sembunyikan Mini Map Overview"
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+          </button>
         </div>
         <div ref={miniMapContainerRef} className="w-full h-full" />
         {/* Reticle / Scope representation in minimap center */}
@@ -3100,6 +4420,18 @@ export default function MapContainer({
           <div className="absolute w-0.5 h-3 bg-[#38bdf8] opacity-85"></div>
         </div>
       </div>
+
+      {/* Toggle Mini Map Button when hidden */}
+      {!showMiniMap && (
+        <button
+          onClick={() => setShowMiniMap(true)}
+          className="absolute bottom-5 right-5 bg-[#0f172a]/90 hover:bg-[#1e293b] text-slate-300 hover:text-white border border-[#334155] hover:border-[#38bdf8] rounded-xl px-3 py-2 shadow-2xl z-35 flex items-center gap-1.5 font-mono text-[9px] font-bold transition-all cursor-pointer animate-in fade-in zoom-in duration-200"
+          title="Tampilkan Mini Map Overview"
+        >
+          <Eye className="w-3.5 h-3.5 text-[#38bdf8]" />
+          <span>MINI MAP OVERVIEW</span>
+        </button>
+      )}
 
       {/* 3. Floating Tool Panels & HUDs */}
 
@@ -3170,23 +4502,6 @@ export default function MapContainer({
           title="Deteksi & Zoom ke Lokasi Saya"
         >
           <Locate className={`w-4 h-4 ${isLocating ? "animate-spin text-amber-400" : "text-[#38bdf8]"}`} />
-        </button>
-
-        {/* Toggle Mini Map Control */}
-        <button
-          onClick={() => setShowMiniMap((prev) => !prev)}
-          className={`hidden md:flex cursor-pointer p-2.5 rounded-lg border shadow-lg font-sans text-xs items-center justify-center transition-all ${
-            showMiniMap
-              ? "bg-[#1e293b]/90 border-[#38bdf8]/80 text-[#38bdf8] font-bold"
-              : "bg-[#0f172a] border-[#334155] text-slate-400 hover:bg-[#1e293b] hover:text-white"
-          }`}
-          title={showMiniMap ? "Sembunyikan Mini Map Overview" : "Tampilkan Mini Map Overview"}
-        >
-          {showMiniMap ? (
-            <Eye className="w-4 h-4" />
-          ) : (
-            <EyeOff className="w-4 h-4 text-slate-400" />
-          )}
         </button>
 
         {/* Zoom Controls */}
@@ -4769,30 +6084,30 @@ export default function MapContainer({
           />
 
           {/* Left panel: Control settings */}
-          <div className="w-full md:w-80 bg-[#0f172a] border border-[#334155] rounded-xl p-4 flex flex-col gap-4 text-slate-200 shrink-0 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-[#334155] pb-2">
+          <div className="w-full md:w-80 bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-4 text-slate-800 shrink-0 shadow-xl">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-[#38bdf8]" />
-                <h3 className="font-bold text-sm tracking-wide text-slate-100 font-mono">
+                <Printer className="w-4 h-4 text-blue-600" />
+                <h3 className="font-bold text-sm tracking-wide text-slate-800 font-sans">
                   LAYOUT CETAK
                 </h3>
               </div>
               <button
                 onClick={() => setPrintDialogOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800/80 transition-all cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100 transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Tab Headers */}
-            <div className="grid grid-cols-2 gap-1 bg-slate-900/60 p-1 rounded-lg border border-[#334155]/60 text-xs font-mono">
+            <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-sans">
               <button
                 onClick={() => setPrintSidebarTab("info")}
                 className={`py-1.5 rounded transition-all cursor-pointer ${
                   printSidebarTab === "info"
-                    ? "bg-[#38bdf8]/10 border border-[#38bdf8]/30 text-[#38bdf8] font-bold"
-                    : "text-slate-400 hover:text-slate-200 border border-transparent"
+                    ? "bg-white border border-slate-200 text-blue-600 font-bold shadow-sm"
+                    : "text-slate-500 hover:text-slate-800 border border-transparent"
                 }`}
               >
                 Informasi Utama
@@ -4801,8 +6116,8 @@ export default function MapContainer({
                 onClick={() => setPrintSidebarTab("elements")}
                 className={`py-1.5 rounded transition-all cursor-pointer ${
                   printSidebarTab === "elements"
-                    ? "bg-[#38bdf8]/10 border border-[#38bdf8]/30 text-[#38bdf8] font-bold"
-                    : "text-slate-400 hover:text-slate-200 border border-transparent"
+                    ? "bg-white border border-slate-200 text-blue-600 font-bold shadow-sm"
+                    : "text-slate-500 hover:text-slate-800 border border-transparent"
                 }`}
               >
                 Elemen Tambahan
@@ -4813,34 +6128,445 @@ export default function MapContainer({
             {printSidebarTab === "info" ? (
               <div className="flex flex-col gap-3 overflow-y-auto max-h-[55vh] pr-1 scrollbar-thin">
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  <label className="block text-[10px] text-blue-600 font-extrabold uppercase mb-1 font-mono flex items-center gap-1">
+                    🎨 Template Desain Cetak PDF
+                  </label>
+                  <select
+                    value={printTemplate}
+                    onChange={(e) => setPrintTemplate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
+                  >
+                    <option value="default">Default Klasik (Standar Bappeda)</option>
+                    
+                    <optgroup label="📚 KATEGORI 1: EDITORIAL & PUBLIKASI" className="text-blue-600 font-bold font-mono">
+                      <option value="classic_editorial" className="text-slate-800 font-mono">Classic Editorial</option>
+                      <option value="magazine_spread" className="text-slate-800 font-mono">Magazine Spread</option>
+                      <option value="academic_paper" className="text-slate-800 font-mono">Academic Paper</option>
+                    </optgroup>
+
+                    <optgroup label="💼 KATEGORI 2: BUSINESS & CORPORATE" className="text-emerald-600 font-bold font-mono">
+                      <option value="corporate_dashboard" className="text-slate-800 font-mono">Corporate Dashboard</option>
+                      <option value="executive_brief" className="text-slate-800 font-mono">Executive Brief</option>
+                      <option value="government_report" className="text-slate-800 font-mono">Government Report</option>
+                      <option value="storytelling_poster" className="text-slate-800 font-mono">Storytelling Poster</option>
+                      <option value="infographic_map" className="text-slate-800 font-mono">Infographic Map</option>
+                      <option value="vintage_heritage" className="text-slate-800 font-mono">Vintage Heritage</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                {printTemplate !== "default" && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-3">
+                    <span className="block text-[10px] text-amber-700 font-extrabold uppercase font-mono tracking-wider">
+                      ✏️ Edit Konten Khas Template ({printTemplate.replace("_", " ").toUpperCase()})
+                    </span>
+
+                    {printTemplate === "classic_editorial" && (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Judul Inset</label>
+                          <input
+                            type="text"
+                            value={tempInsetTitle}
+                            onChange={(e) => setTempInsetTitle(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Deskripsi Inset</label>
+                          <input
+                            type="text"
+                            value={tempInsetDescription}
+                            onChange={(e) => setTempInsetDescription(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {printTemplate === "magazine_spread" && (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Label Kategori</label>
+                          <input
+                            type="text"
+                            value={tempMagLabel}
+                            onChange={(e) => setTempMagLabel(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Halaman</label>
+                          <input
+                            type="text"
+                            value={tempMagPage}
+                            onChange={(e) => setTempMagPage(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {printTemplate === "academic_paper" && (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Keterangan Gambar (Figure)</label>
+                          <input
+                            type="text"
+                            value={tempAcademicFigure}
+                            onChange={(e) => setTempAcademicFigure(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Keterangan Pengiriman (Submitted)</label>
+                          <input
+                            type="text"
+                            value={tempAcademicSubmitted}
+                            onChange={(e) => setTempAcademicSubmitted(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {printTemplate === "corporate_dashboard" && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Nama Klien</label>
+                          <input
+                            type="text"
+                            value={tempCorpClient}
+                            onChange={(e) => setTempCorpClient(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+
+                        {/* Metrics list */}
+                        <div className="space-y-1.5 border-t border-slate-200 pt-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-slate-500 font-bold font-mono">DISTRIBUSI AREA (GRAFIK)</span>
+                            <button
+                              onClick={() => setTempCorpMetrics([...tempCorpMetrics, { name: "Baru", value: "30" }])}
+                              className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/50 px-1.5 py-0.5 rounded flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Plus className="w-2.5 h-2.5" /> Tambah
+                            </button>
+                          </div>
+                          {tempCorpMetrics.map((met, idx) => (
+                            <div key={idx} className="flex gap-1 items-center">
+                              <input
+                                type="text"
+                                value={met.name}
+                                onChange={(e) => {
+                                  const newM = [...tempCorpMetrics];
+                                  newM[idx].name = e.target.value;
+                                  setTempCorpMetrics(newM);
+                                }}
+                                className="w-1/2 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-800"
+                                placeholder="Nama"
+                              />
+                              <input
+                                type="text"
+                                value={met.value}
+                                onChange={(e) => {
+                                  const newM = [...tempCorpMetrics];
+                                  newM[idx].value = e.target.value;
+                                  setTempCorpMetrics(newM);
+                                }}
+                                className="w-1/3 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-800"
+                                placeholder="30"
+                              />
+                              <button
+                                onClick={() => setTempCorpMetrics(tempCorpMetrics.filter((_, i) => i !== idx))}
+                                className="text-red-500 hover:text-red-700 p-0.5 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* KPIs list */}
+                        <div className="space-y-1.5 border-t border-slate-200 pt-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-slate-500 font-bold font-mono">KPI METRICS</span>
+                            <button
+                              onClick={() => setTempCorpKPIs([...tempCorpKPIs, { label: "KPI Baru", value: "10" }])}
+                              className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/50 px-1.5 py-0.5 rounded flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Plus className="w-2.5 h-2.5" /> Tambah
+                            </button>
+                          </div>
+                          {tempCorpKPIs.map((kpi, idx) => (
+                            <div key={idx} className="flex gap-1 items-center">
+                              <input
+                                type="text"
+                                value={kpi.label}
+                                onChange={(e) => {
+                                  const newK = [...tempCorpKPIs];
+                                  newK[idx].label = e.target.value;
+                                  setTempCorpKPIs(newK);
+                                }}
+                                className="w-1/2 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-800"
+                                placeholder="Label"
+                              />
+                              <input
+                                type="text"
+                                value={kpi.value}
+                                onChange={(e) => {
+                                  const newK = [...tempCorpKPIs];
+                                  newK[idx].value = e.target.value;
+                                  setTempCorpKPIs(newK);
+                                }}
+                                className="w-1/3 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-800"
+                                placeholder="Nilai"
+                              />
+                              <button
+                                onClick={() => setTempCorpKPIs(tempCorpKPIs.filter((_, i) => i !== idx))}
+                                className="text-red-500 hover:text-red-700 p-0.5 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {printTemplate === "executive_brief" && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Label Dokumen</label>
+                          <input
+                            type="text"
+                            value={tempExecLabel}
+                            onChange={(e) => setTempExecLabel(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+
+                        {/* Insights List */}
+                        <div className="space-y-2 border-t border-slate-200 pt-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-slate-500 font-bold font-mono">💡 KEY INSIGHTS (BISA DITAMBAH)</span>
+                            <button
+                              onClick={() => setTempExecInsights([...tempExecInsights, "Topik Baru: Tulis deskripsi insight di sini."])}
+                              className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/50 px-1.5 py-0.5 rounded flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Plus className="w-2.5 h-2.5" /> Tambah
+                            </button>
+                          </div>
+                          {tempExecInsights.map((ins, idx) => (
+                            <div key={idx} className="flex gap-1.5 items-start">
+                              <textarea
+                                value={ins}
+                                onChange={(e) => {
+                                  const newI = [...tempExecInsights];
+                                  newI[idx] = e.target.value;
+                                  setTempExecInsights(newI);
+                                }}
+                                className="flex-1 bg-white border border-slate-200 rounded px-1.5 py-1 text-[10px] font-mono text-slate-800 resize-none h-12"
+                                placeholder="Format - Judul: Deskripsi"
+                              />
+                              <button
+                                onClick={() => setTempExecInsights(tempExecInsights.filter((_, i) => i !== idx))}
+                                className="text-red-500 hover:text-red-700 p-0.5 mt-1 shrink-0 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {printTemplate === "government_report" && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">No. Lembar</label>
+                            <input
+                              type="text"
+                              value={tempGovSheet}
+                              onChange={(e) => setTempGovSheet(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Edisi</label>
+                            <input
+                              type="text"
+                              value={tempGovEdition}
+                              onChange={(e) => setTempGovEdition(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Interval Kontur</label>
+                          <input
+                            type="text"
+                            value={tempGovContour}
+                            onChange={(e) => setTempGovContour(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {printTemplate === "storytelling_poster" && (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Narasi Poster</label>
+                          <textarea
+                            value={tempPosterNarrative}
+                            onChange={(e) => setTempPosterNarrative(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono h-24 resize-none leading-relaxed"
+                            placeholder="Tulis paragraf cerita di sini..."
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {printTemplate === "infographic_map" && (
+                      <div className="space-y-3">
+                        {/* Infographic metrics */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-slate-500 font-bold font-mono">📊 BIG METRICS (KARTU ATAS)</span>
+                            <button
+                              onClick={() => setTempInfoMetrics([...tempInfoMetrics, { label: "Metrik", value: "100" }])}
+                              className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/50 px-1.5 py-0.5 rounded flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Plus className="w-2.5 h-2.5" /> Tambah
+                            </button>
+                          </div>
+                          {tempInfoMetrics.map((met, idx) => (
+                            <div key={idx} className="flex gap-1 items-center">
+                              <input
+                                type="text"
+                                value={met.label}
+                                onChange={(e) => {
+                                  const newM = [...tempInfoMetrics];
+                                  newM[idx].label = e.target.value;
+                                  setTempInfoMetrics(newM);
+                                }}
+                                className="w-1/2 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-800"
+                                placeholder="Label (cth: Jiwa)"
+                              />
+                              <input
+                                type="text"
+                                value={met.value}
+                                onChange={(e) => {
+                                  const newM = [...tempInfoMetrics];
+                                  newM[idx].value = e.target.value;
+                                  setTempInfoMetrics(newM);
+                                }}
+                                className="w-1/3 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-800"
+                                placeholder="Nilai (cth: 250K)"
+                              />
+                              <button
+                                onClick={() => setTempInfoMetrics(tempInfoMetrics.filter((_, i) => i !== idx))}
+                                className="text-red-500 hover:text-red-700 p-0.5 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Infographic callouts */}
+                        <div className="space-y-2 border-t border-slate-200 pt-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-slate-500 font-bold font-mono">📢 CALLOUT BOXES (BAWAH)</span>
+                            <button
+                              onClick={() => setTempInfoCallouts([...tempInfoCallouts, { title: "Topik", text: "Isi keterangan singkat." }])}
+                              className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/50 px-1.5 py-0.5 rounded flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Plus className="w-2.5 h-2.5" /> Tambah
+                            </button>
+                          </div>
+                          {tempInfoCallouts.map((call, idx) => (
+                            <div key={idx} className="bg-slate-100 p-1.5 border border-slate-200 rounded space-y-1 relative">
+                              <button
+                                onClick={() => setTempInfoCallouts(tempInfoCallouts.filter((_, i) => i !== idx))}
+                                className="absolute top-1 right-1 text-red-500 hover:text-red-700 p-0.5 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                              <input
+                                type="text"
+                                value={call.title}
+                                onChange={(e) => {
+                                  const newC = [...tempInfoCallouts];
+                                  newC[idx].title = e.target.value;
+                                  setTempInfoCallouts(newC);
+                                }}
+                                className="w-[85%] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-bold font-mono text-slate-800"
+                                placeholder="Judul Callout"
+                              />
+                              <input
+                                type="text"
+                                value={call.text}
+                                onChange={(e) => {
+                                  const newC = [...tempInfoCallouts];
+                                  newC[idx].text = e.target.value;
+                                  setTempInfoCallouts(newC);
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-600"
+                                placeholder="Keterangan singkat..."
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {printTemplate === "vintage_heritage" && (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">Tulisan Atas Kartouche</label>
+                          <input
+                            type="text"
+                            value={tempVintageTop}
+                            onChange={(e) => setTempVintageTop(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">
                     Judul Utama Peta
                   </label>
                   <input
                     type="text"
                     value={printTitle}
                     onChange={(e) => setPrintTitle(e.target.value)}
-                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                     placeholder="Contoh: PETA KERAWANAN BANJIR"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">
                     Sub-Judul / Instansi
                   </label>
                   <input
                     type="text"
                     value={printSubtitle}
                     onChange={(e) => setPrintSubtitle(e.target.value)}
-                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                     placeholder="Contoh: Bappeda Kota Banda Aceh"
                   />
                 </div>
 
                 {/* Logo Upload */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">
                     Logo / Lambang Instansi
                   </label>
                   <input
@@ -4848,18 +6574,18 @@ export default function MapContainer({
                     type="file"
                     accept="image/*"
                     onChange={handleLogoUpload}
-                    className="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[10px] file:font-mono file:font-bold file:bg-[#38bdf8]/10 file:text-[#38bdf8] hover:file:bg-[#38bdf8]/20 cursor-pointer file:cursor-pointer"
+                    className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[10px] file:font-mono file:font-bold file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer file:cursor-pointer"
                   />
                   {printLogo && (
                     <div className="flex items-center gap-2 mt-1.5">
                       <img
                         src={printLogo}
                         alt="Logo"
-                        className="w-8 h-8 object-contain border border-[#334155] rounded"
+                        className="w-8 h-8 object-contain border border-slate-200 rounded bg-slate-50"
                       />
                       <button
                         onClick={handleRemoveLogo}
-                        className="text-[10px] text-red-400 hover:text-red-300 font-mono underline cursor-pointer"
+                        className="text-[10px] text-red-500 hover:text-red-700 font-mono underline cursor-pointer"
                       >
                         Hapus Logo
                       </button>
@@ -4869,35 +6595,38 @@ export default function MapContainer({
 
                 {/* Scale text input */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
-                    Skala Peta (Teks)
+                  <label className="block text-[10px] text-blue-600 font-bold uppercase mb-1 font-mono flex items-center gap-1">
+                    <span>📏 SKALA PETA (TEKS - OTOMATIS)</span>
                   </label>
                   <input
                     type="text"
                     value={printScaleText}
                     onChange={(e) => setPrintScaleText(e.target.value)}
-                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                    className="w-full bg-blue-50/50 border border-blue-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono font-medium"
                     placeholder="Contoh: 1:25.000"
                   />
+                  <span className="text-[9px] text-slate-400 font-mono mt-0.5 block leading-normal">
+                    Dihitung otomatis dari zoom peta saat ini. Anda dapat tetap menyesuaikannya secara manual.
+                  </span>
                 </div>
 
                 {/* Source / Creator text input */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">
                     Sumber / Pembuat Peta
                   </label>
                   <input
                     type="text"
                     value={printSourceText}
                     onChange={(e) => setPrintSourceText(e.target.value)}
-                    className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                     placeholder="Contoh: Sumber: Bappeda Kota Banda Aceh"
                   />
                 </div>
 
                 {/* Paper size selection */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">
                     Ukuran Kertas
                   </label>
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono">
@@ -4905,8 +6634,8 @@ export default function MapContainer({
                       onClick={() => setPrintPaperSize("A4")}
                       className={`py-1.5 rounded border transition-all cursor-pointer ${
                         printPaperSize === "A4"
-                          ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
-                          : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                          ? "bg-blue-50 border-blue-300 text-blue-600 font-bold"
+                          : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
                       }`}
                     >
                       Kertas A4
@@ -4915,8 +6644,8 @@ export default function MapContainer({
                       onClick={() => setPrintPaperSize("A3")}
                       className={`py-1.5 rounded border transition-all cursor-pointer ${
                         printPaperSize === "A3"
-                          ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
-                          : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                          ? "bg-blue-50 border-blue-300 text-blue-600 font-bold"
+                          : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
                       }`}
                     >
                       Kertas A3 (Besar)
@@ -4926,7 +6655,7 @@ export default function MapContainer({
 
                 {/* Orientation selection */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">
                     Orientasi Halaman
                   </label>
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono">
@@ -4934,8 +6663,8 @@ export default function MapContainer({
                       onClick={() => setPrintOrientation("landscape")}
                       className={`py-1.5 rounded border transition-all cursor-pointer ${
                         printOrientation === "landscape"
-                          ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
-                          : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                          ? "bg-blue-50 border-blue-300 text-blue-600 font-bold"
+                          : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
                       }`}
                     >
                       Landscape
@@ -4944,8 +6673,8 @@ export default function MapContainer({
                       onClick={() => setPrintOrientation("portrait")}
                       className={`py-1.5 rounded border transition-all cursor-pointer ${
                         printOrientation === "portrait"
-                          ? "bg-[#38bdf8]/10 border-[#38bdf8] text-[#38bdf8] font-bold"
-                          : "bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white"
+                          ? "bg-blue-50 border-blue-300 text-blue-600 font-bold"
+                          : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
                       }`}
                     >
                       Portrait
@@ -4953,57 +6682,111 @@ export default function MapContainer({
                   </div>
                 </div>
 
+                {/* Edit Elemen & Isi Legenda Peta */}
+                <div className="border-t border-slate-200 pt-2.5">
+                  <span className="block text-[10px] text-blue-600 font-bold uppercase mb-2 font-mono">
+                    ✏️ EDIT ELEMEN & ISI LEGENDA PETA
+                  </span>
+                  <div className="space-y-2.5 bg-slate-50 p-2.5 border border-slate-200 rounded-lg">
+                    <div>
+                      <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">
+                        Judul Kotak Legenda
+                      </label>
+                      <input
+                        type="text"
+                        value={printLegendTitle}
+                        onChange={(e) => setPrintLegendTitle(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
+                        placeholder="Contoh: LEGENDA PETA"
+                      />
+                    </div>
+
+                    {layers.filter((l) => l.visible).length > 0 ? (
+                      <div className="space-y-1.5 border-t border-slate-200 pt-2">
+                        <span className="block text-[8px] text-slate-500 font-bold font-mono uppercase">
+                          Label Layer Aktif Peta:
+                        </span>
+                        {layers
+                          .filter((l) => l.visible)
+                          .map((l) => (
+                            <div key={l.id} className="flex gap-1.5 items-center justify-between">
+                              <span className="text-[9px] text-slate-600 font-mono truncate w-1/3" title={l.name}>
+                                {l.name}
+                              </span>
+                              <input
+                                type="text"
+                                value={printLayerLegendNames[l.id] !== undefined ? printLayerLegendNames[l.id] : l.name}
+                                onChange={(e) => {
+                                  setPrintLayerLegendNames({
+                                    ...printLayerLegendNames,
+                                    [l.id]: e.target.value,
+                                  });
+                                }}
+                                className="w-2/3 bg-white border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                                placeholder={l.name}
+                              />
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="text-[9px] text-amber-600 font-mono border-t border-slate-200 pt-2 text-center">
+                        ⚠️ Tidak ada layer aktif di peta untuk legenda. Aktifkan layer di panel layer utama.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Kop Instansi Detail */}
-                <div className="border-t border-[#334155]/60 pt-2.5">
-                  <span className="block text-[10px] text-sky-400 font-bold uppercase mb-2 font-mono">
+                <div className="border-t border-slate-200 pt-2.5">
+                  <span className="block text-[10px] text-blue-600 font-bold uppercase mb-2 font-mono">
                     🏢 IDENTITAS KOP INSTANSI
                   </span>
                   <div className="space-y-2">
                     <div>
-                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                      <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">
                         Teks Pemerintah
                       </label>
                       <input
                         type="text"
                         value={printGovernmentName}
                         onChange={(e) => setPrintGovernmentName(e.target.value)}
-                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                         placeholder="Contoh: PEMERINTAH KOTA"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                      <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">
                         Nama Wilayah / Daerah
                       </label>
                       <input
                         type="text"
                         value={printRegionName}
                         onChange={(e) => setPrintRegionName(e.target.value)}
-                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                         placeholder="Contoh: BANDA ACEH"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                      <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">
                         Keterangan Provinsi
                       </label>
                       <input
                         type="text"
                         value={printProvinceName}
                         onChange={(e) => setPrintProvinceName(e.target.value)}
-                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                         placeholder="Contoh: Provinsi Aceh, Indonesia"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                      <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">
                         Nama Kartografer (Pembuat)
                       </label>
                       <input
                         type="text"
                         value={printCartographer}
                         onChange={(e) => setPrintCartographer(e.target.value)}
-                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                         placeholder="Contoh: Bappeda Banda Aceh"
                       />
                     </div>
@@ -5011,32 +6794,32 @@ export default function MapContainer({
                 </div>
 
                 {/* Proyeksi & Koordinat */}
-                <div className="border-t border-[#334155]/60 pt-2.5">
-                  <span className="block text-[10px] text-sky-400 font-bold uppercase mb-2 font-mono">
+                <div className="border-t border-slate-200 pt-2.5">
+                  <span className="block text-[10px] text-blue-600 font-bold uppercase mb-2 font-mono">
                     🌐 PROYEKSI & DATUM KOORDINAT
                   </span>
                   <div className="space-y-2">
                     <div>
-                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                      <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">
                         Sistem Proyeksi (Teks Overlay)
                       </label>
                       <input
                         type="text"
                         value={printProjection}
                         onChange={(e) => setPrintProjection(e.target.value)}
-                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                         placeholder="Contoh: SISTEM PROYEKSI: UTM ZONE 46N"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-0.5">
+                      <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-0.5">
                         Sistem Rujukan / Datum
                       </label>
                       <input
                         type="text"
                         value={printDatum}
                         onChange={(e) => setPrintDatum(e.target.value)}
-                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                         placeholder="Contoh: WGS 84 / UTM 46N"
                       />
                     </div>
@@ -5044,22 +6827,22 @@ export default function MapContainer({
                 </div>
 
                 {/* Kontrol Tampilan Legenda, Kompas, & Skala */}
-                <div className="border-t border-[#334155]/60 pt-2.5">
-                  <span className="block text-[10px] text-sky-400 font-bold uppercase mb-2 font-mono">
+                <div className="border-t border-slate-200 pt-2.5">
+                  <span className="block text-[10px] text-blue-600 font-bold uppercase mb-2 font-mono">
                     ⚙️ VISIBILITAS ELEMEN KOP
                   </span>
-                  <div className="space-y-2.5 bg-slate-900/50 p-2.5 border border-[#334155]/30 rounded-lg">
+                  <div className="space-y-2.5 bg-slate-50 p-2.5 border border-slate-200 rounded-lg">
                     {/* Toggle Legenda */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-medium text-slate-300">
+                      <span className="text-[11px] font-mono font-medium text-slate-700">
                         Tampilkan Legenda
                       </span>
                       <button
                         onClick={() => setPrintShowLegend(!printShowLegend)}
                         className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
                           printShowLegend
-                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                            : "bg-slate-800 text-slate-400 border-transparent hover:text-slate-300"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                            : "bg-white text-slate-400 border-slate-200 hover:text-slate-700 hover:bg-slate-50"
                         }`}
                       >
                         {printShowLegend ? "AKTIF" : "Sembunyi"}
@@ -5068,15 +6851,15 @@ export default function MapContainer({
 
                     {/* Toggle Kompas */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-medium text-slate-300">
+                      <span className="text-[11px] font-mono font-medium text-slate-700">
                         Tampilkan Arah Utara
                       </span>
                       <button
                         onClick={() => setPrintShowCompass(!printShowCompass)}
                         className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
                           printShowCompass
-                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                            : "bg-slate-800 text-slate-400 border-transparent hover:text-slate-300"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                            : "bg-white text-slate-400 border-slate-200 hover:text-slate-700 hover:bg-slate-50"
                         }`}
                       >
                         {printShowCompass ? "AKTIF" : "Sembunyi"}
@@ -5085,18 +6868,155 @@ export default function MapContainer({
 
                     {/* Scale bar segment km input */}
 
-                    <div className="border-t border-[#334155]/40 pt-2 mt-1">
-                      <label className="block text-[9px] text-slate-400 font-mono uppercase mb-1">
-                        Nilai Batas Skala Bar
+                    <div className="border-t border-slate-200 pt-2 mt-1">
+                      <label className="block text-[9px] text-blue-600 font-bold uppercase mb-1 font-mono">
+                        📐 NILAI BATAS SKALA BAR (OTOMATIS)
                       </label>
                       <input
                         type="text"
                         value={printScaleBarKm}
                         onChange={(e) => setPrintScaleBarKm(e.target.value)}
-                        className="w-full bg-[#1e293b] border border-[#334155] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] transition-all font-mono"
+                        className="w-full bg-blue-50/30 border border-blue-200 rounded px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition-all font-mono"
                         placeholder="Contoh: 3 km atau 500 m"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Kontrol Grid Koordinat */}
+                <div className="border-t border-slate-200 pt-2.5">
+                  <span className="block text-[10px] text-blue-600 font-bold uppercase mb-2 font-mono">
+                    🌐 GRID KOORDINAT PETA
+                  </span>
+                  <div className="space-y-2.5 bg-slate-50 p-2.5 border border-slate-200 rounded-lg">
+                    {/* Toggle Grid */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-medium text-slate-700">
+                        Tampilkan Grid
+                      </span>
+                      <button
+                        onClick={() => setPrintShowGrid(!printShowGrid)}
+                        className={`px-2.5 py-1 text-[10px] rounded font-bold font-mono border transition-all cursor-pointer ${
+                          printShowGrid
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                            : "bg-white text-slate-400 border-slate-200 hover:text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {printShowGrid ? "AKTIF" : "Sembunyi"}
+                      </button>
+                    </div>
+
+                    {printShowGrid && (
+                      <>
+                        {/* Grid Style */}
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-1">
+                            Gaya Grid
+                          </label>
+                          <div className="grid grid-cols-3 gap-1 text-[10px] font-mono">
+                            {(["line", "cross", "tick"] as const).map((style) => {
+                              const labels = { line: "Garis", cross: "Tambah (+)", tick: "Tepi (Tick)" };
+                              return (
+                                <button
+                                  key={style}
+                                  onClick={() => setPrintGridStyle(style)}
+                                  className={`py-1 rounded border transition-all cursor-pointer ${
+                                    printGridStyle === style
+                                      ? "bg-blue-50 border-blue-300 text-blue-600 font-bold"
+                                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  {labels[style]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Grid Interval */}
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-1">
+                            Kerapatan Grid
+                          </label>
+                          <div className="grid grid-cols-4 gap-1 text-[10px] font-mono">
+                            {[3, 4, 5, 6].map((divs) => (
+                              <button
+                                key={divs}
+                                onClick={() => setPrintGridInterval(divs)}
+                                className={`py-1 rounded border transition-all cursor-pointer ${
+                                  printGridInterval === divs
+                                    ? "bg-blue-50 border-blue-300 text-blue-600 font-bold"
+                                    : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                }`}
+                              >
+                                {divs}x{divs}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Label Format */}
+                        <div>
+                          <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-1">
+                            Format Koordinat
+                          </label>
+                          <div className="grid grid-cols-3 gap-1 text-[10px] font-mono">
+                            {(["dms", "decimal", "utm"] as const).map((fmt) => {
+                              const labels = { dms: "DMS", decimal: "Desimal", utm: "UTM (m)" };
+                              return (
+                                <button
+                                  key={fmt}
+                                  onClick={() => setPrintGridLabelFormat(fmt)}
+                                  className={`py-1 rounded border transition-all cursor-pointer ${
+                                    printGridLabelFormat === fmt
+                                      ? "bg-blue-50 border-blue-300 text-blue-600 font-bold"
+                                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  {labels[fmt]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Custom Grid Color & Font Size */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-1">
+                              Warna Grid
+                            </label>
+                            <select
+                              value={printGridColor}
+                              onChange={(e) => setPrintGridColor(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-[10px] text-slate-700 focus:outline-none focus:border-blue-500 transition-all font-mono"
+                            >
+                              <option value="rgba(0, 0, 0, 0.35)">Hitam Transparan</option>
+                              <option value="rgba(0, 0, 0, 0.65)">Hitam Pekat</option>
+                              <option value="rgba(59, 130, 246, 0.45)">Biru</option>
+                              <option value="rgba(239, 68, 68, 0.45)">Merah</option>
+                              <option value="rgba(255, 255, 255, 0.6)">Putih Transparan</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[9px] text-slate-500 font-medium font-mono uppercase mb-1">
+                              Ukuran Huruf
+                            </label>
+                            <select
+                              value={printGridLabelSize}
+                              onChange={(e) => setPrintGridLabelSize(Number(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-[10px] text-slate-700 focus:outline-none focus:border-blue-500 transition-all font-mono"
+                            >
+                              <option value="6">6 px (Sangat Kecil)</option>
+                              <option value="7">7 px</option>
+                              <option value="8">8 px (Sedang)</option>
+                              <option value="9">9 px</option>
+                              <option value="10">10 px (Besar)</option>
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -5104,38 +7024,45 @@ export default function MapContainer({
               <div className="flex flex-col gap-3 overflow-y-auto max-h-[55vh] pr-1 scrollbar-thin">
                 {/* Add new element buttons */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1.5 font-mono">
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1.5 font-mono">
                     Tambah Objek Baru ke Peta
                   </label>
                   <div className="grid grid-cols-2 gap-1.5 text-xs font-mono">
                     <button
                       onClick={handleAddTextElement}
-                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-[#334155] transition-all cursor-pointer text-[11px]"
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-all cursor-pointer text-[11px]"
                     >
-                      <Type className="w-3.5 h-3.5 text-sky-400" />
+                      <Type className="w-3.5 h-3.5 text-blue-500" />
                       Teks
                     </button>
                     <button
                       onClick={handleAddLineElement}
-                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-[#334155] transition-all cursor-pointer text-[11px]"
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-all cursor-pointer text-[11px]"
                     >
-                      <Slash className="w-3.5 h-3.5 text-red-400" />
+                      <Slash className="w-3.5 h-3.5 text-rose-500" />
                       Garis
                     </button>
                     <button
                       onClick={handleAddRectangleElement}
-                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-[#334155] transition-all cursor-pointer text-[11px]"
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-all cursor-pointer text-[11px]"
                     >
-                      <Square className="w-3.5 h-3.5 text-emerald-400" />
+                      <Square className="w-3.5 h-3.5 text-emerald-500" />
                       Persegi
                     </button>
                     <button
-                      onClick={handleAddImageElement}
-                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-[#334155] transition-all cursor-pointer text-[11px]"
+                      onClick={() => layoutImageInputRef.current?.click()}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-all cursor-pointer text-[11px]"
                     >
-                      <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
                       Gambar
                     </button>
+                    <input
+                      type="file"
+                      ref={layoutImageInputRef}
+                      accept="image/*"
+                      onChange={handleAddUploadedImageElement}
+                      className="hidden"
+                    />
                   </div>
                 </div>
 
@@ -5146,7 +7073,7 @@ export default function MapContainer({
                   );
                   if (!el) {
                     return (
-                      <div className="bg-slate-900/40 border border-[#334155]/40 rounded-lg p-2.5 text-center text-xs text-slate-400 font-mono">
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-center text-xs text-slate-500 font-mono">
                         Pilih objek di kertas atau daftar di bawah untuk
                         mengeditnya.
                       </div>
@@ -5154,9 +7081,9 @@ export default function MapContainer({
                   }
 
                   return (
-                    <div className="bg-[#1e293b]/70 border border-[#334155] rounded-lg p-2.5 flex flex-col gap-2">
-                      <div className="flex justify-between items-center border-b border-[#334155] pb-1.5">
-                        <span className="text-[10px] text-sky-400 font-bold uppercase font-mono tracking-wider">
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex flex-col gap-2">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                        <span className="text-[10px] text-blue-600 font-bold uppercase font-mono tracking-wider">
                           Edit: {el.type.toUpperCase()}
                         </span>
                         <button
@@ -5166,7 +7093,7 @@ export default function MapContainer({
                             );
                             setSelectedElementId(null);
                           }}
-                          className="text-red-400 hover:text-red-300 p-1 hover:bg-red-500/10 rounded transition-all cursor-pointer"
+                          className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-all cursor-pointer"
                           title="Hapus objek"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -5176,7 +7103,7 @@ export default function MapContainer({
                       {/* Position X and Y percentage sliders */}
                       <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
                         <div>
-                          <span className="text-slate-400">
+                          <span className="text-slate-500">
                             Posisi X: {el.x}%
                           </span>
                           <input
@@ -5189,11 +7116,11 @@ export default function MapContainer({
                                 x: parseInt(e.target.value),
                               })
                             }
-                            className="w-full accent-sky-500 cursor-pointer"
+                            className="w-full accent-blue-500 cursor-pointer"
                           />
                         </div>
                         <div>
-                          <span className="text-slate-400">
+                          <span className="text-slate-500">
                             Posisi Y: {el.y}%
                           </span>
                           <input
@@ -5206,7 +7133,7 @@ export default function MapContainer({
                                 y: parseInt(e.target.value),
                               })
                             }
-                            className="w-full accent-sky-500 cursor-pointer"
+                            className="w-full accent-blue-500 cursor-pointer"
                           />
                         </div>
                       </div>
@@ -5215,7 +7142,7 @@ export default function MapContainer({
                       {el.type === "text" && (
                         <div className="flex flex-col gap-2 text-xs">
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Isi Teks
                             </span>
                             <input
@@ -5226,11 +7153,11 @@ export default function MapContainer({
                                   content: e.target.value,
                                 })
                               }
-                              className="w-full bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#38bdf8] font-mono"
+                              className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Ukuran Font ({el.fontSize}px)
                             </span>
                             <input
@@ -5243,11 +7170,11 @@ export default function MapContainer({
                                   fontSize: parseInt(e.target.value),
                                 })
                               }
-                              className="w-full accent-sky-500 cursor-pointer"
+                              className="w-full accent-blue-500 cursor-pointer"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Warna Teks
                             </span>
                             <div className="flex items-center gap-2">
@@ -5269,51 +7196,12 @@ export default function MapContainer({
                                     fontColor: e.target.value,
                                   })
                                 }
-                                className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
+                                className="flex-1 bg-white border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-800 font-mono focus:outline-none focus:border-blue-500"
                               />
                             </div>
                           </div>
-                        </div>
-                      )}
-
-                      {el.type === "line" && (
-                        <div className="flex flex-col gap-2 text-xs">
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
-                              Panjang Garis ({el.width}px)
-                            </span>
-                            <input
-                              type="range"
-                              min="10"
-                              max="600"
-                              value={el.width || 100}
-                              onChange={(e) =>
-                                updateSelectedElement({
-                                  width: parseInt(e.target.value),
-                                })
-                              }
-                              className="w-full accent-sky-500 cursor-pointer"
-                            />
-                          </div>
-                          <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
-                              Ketebalan ({el.lineWidth}px)
-                            </span>
-                            <input
-                              type="range"
-                              min="1"
-                              max="20"
-                              value={el.lineWidth || 2}
-                              onChange={(e) =>
-                                updateSelectedElement({
-                                  lineWidth: parseInt(e.target.value),
-                                })
-                              }
-                              className="w-full accent-sky-500 cursor-pointer"
-                            />
-                          </div>
-                          <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Rotasi ({el.rotation || 0}°)
                             </span>
                             <input
@@ -5326,11 +7214,67 @@ export default function MapContainer({
                                   rotation: parseInt(e.target.value),
                                 })
                               }
-                              className="w-full accent-sky-500 cursor-pointer"
+                              className="w-full accent-blue-500 cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {el.type === "line" && (
+                        <div className="flex flex-col gap-2 text-xs">
+                          <div>
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
+                              Panjang Garis ({el.width}px)
+                            </span>
+                            <input
+                              type="range"
+                              min="10"
+                              max="600"
+                              value={el.width || 100}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  width: parseInt(e.target.value),
+                                })
+                              }
+                              className="w-full accent-blue-500 cursor-pointer"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
+                              Ketebalan ({el.lineWidth}px)
+                            </span>
+                            <input
+                              type="range"
+                              min="1"
+                              max="20"
+                              value={el.lineWidth || 2}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  lineWidth: parseInt(e.target.value),
+                                })
+                              }
+                              className="w-full accent-blue-500 cursor-pointer"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
+                              Rotasi ({el.rotation || 0}°)
+                            </span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              value={el.rotation || 0}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  rotation: parseInt(e.target.value),
+                                })
+                              }
+                              className="w-full accent-blue-500 cursor-pointer"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Warna Garis
                             </span>
                             <div className="flex items-center gap-2">
@@ -5352,7 +7296,7 @@ export default function MapContainer({
                                     lineColor: e.target.value,
                                   })
                                 }
-                                className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
+                                className="flex-1 bg-white border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-800 font-mono focus:outline-none focus:border-blue-500"
                               />
                             </div>
                           </div>
@@ -5363,7 +7307,7 @@ export default function MapContainer({
                         <div className="flex flex-col gap-2 text-xs">
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                                 Lebar ({el.width}px)
                               </span>
                               <input
@@ -5376,11 +7320,11 @@ export default function MapContainer({
                                     width: parseInt(e.target.value),
                                   })
                                 }
-                                className="w-full accent-sky-500 cursor-pointer"
+                                className="w-full accent-blue-500 cursor-pointer"
                               />
                             </div>
                             <div>
-                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                                 Tinggi ({el.height}px)
                               </span>
                               <input
@@ -5393,12 +7337,12 @@ export default function MapContainer({
                                     height: parseInt(e.target.value),
                                   })
                                 }
-                                className="w-full accent-sky-500 cursor-pointer"
+                                className="w-full accent-blue-500 cursor-pointer"
                               />
                             </div>
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Tebal Bingkai ({el.rectBorderWidth}px)
                             </span>
                             <input
@@ -5415,11 +7359,11 @@ export default function MapContainer({
                                   rectBorderWidth: parseInt(e.target.value),
                                 })
                               }
-                              className="w-full accent-sky-500 cursor-pointer"
+                              className="w-full accent-blue-500 cursor-pointer"
                             />
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Warna Bingkai
                             </span>
                             <div className="flex items-center gap-2">
@@ -5441,12 +7385,12 @@ export default function MapContainer({
                                     rectBorderColor: e.target.value,
                                   })
                                 }
-                                className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-0.5 text-xs font-mono"
+                                className="flex-1 bg-white border border-slate-200 rounded px-2 py-0.5 text-xs font-mono focus:outline-none focus:border-blue-500"
                               />
                             </div>
                           </div>
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Warna Latar (Fill)
                             </span>
                             <div className="flex items-center gap-2">
@@ -5483,16 +7427,33 @@ export default function MapContainer({
                                     });
                                   }
                                 }}
-                                className="flex-1 bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs font-mono text-slate-200 focus:outline-none"
+                                className="flex-1 bg-white border border-slate-200 rounded px-2 py-1 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500"
                               >
-                                <option value="solid font-mono">
+                                <option value="solid">
                                   Isi Warna Solid
                                 </option>
-                                <option value="transparan font-mono">
+                                <option value="transparan">
                                   Transparan (Tanpa Latar)
                                 </option>
                               </select>
                             </div>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
+                              Rotasi ({el.rotation || 0}°)
+                            </span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              value={el.rotation || 0}
+                              onChange={(e) =>
+                                updateSelectedElement({
+                                  rotation: parseInt(e.target.value),
+                                })
+                              }
+                              className="w-full accent-blue-500 cursor-pointer"
+                            />
                           </div>
                         </div>
                       )}
@@ -5500,7 +7461,7 @@ export default function MapContainer({
                       {el.type === "image" && (
                         <div className="flex flex-col gap-2 text-xs">
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Preset Gambar / Kompas
                             </span>
                             <select
@@ -5512,19 +7473,19 @@ export default function MapContainer({
                                     : "custom"
                               }
                               onChange={(e) => {
-                                if (e.target.value === "classic") {
-                                  updateSelectedElement({
-                                    imageUrl: CLASSIC_NORTH_ARROW,
-                                  });
-                                } else if (e.target.value === "modern") {
-                                  updateSelectedElement({
-                                    imageUrl: MODERN_NORTH_ARROW,
-                                  });
-                                } else {
-                                  updateSelectedElement({ imageUrl: "" });
-                                }
-                              }}
-                              className="w-full bg-slate-900 border border-[#334155] rounded px-2 py-1 text-xs font-mono text-slate-200 mb-1.5 focus:outline-none"
+                                  if (e.target.value === "classic") {
+                                    updateSelectedElement({
+                                      imageUrl: CLASSIC_NORTH_ARROW,
+                                    });
+                                  } else if (e.target.value === "modern") {
+                                    updateSelectedElement({
+                                      imageUrl: MODERN_NORTH_ARROW,
+                                    });
+                                  } else {
+                                    updateSelectedElement({ imageUrl: "" });
+                                  }
+                                }}
+                              className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs font-mono text-slate-800 mb-1.5 focus:outline-none focus:border-blue-500"
                             >
                               <option value="classic">
                                 Kompas Klasik (North Arrow 1)
@@ -5545,14 +7506,14 @@ export default function MapContainer({
                                   onChange={(e) =>
                                     handleUploadElementImage(e, el.id)
                                   }
-                                  className="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-sky-500/10 file:text-sky-400 cursor-pointer"
+                                  className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer"
                                 />
                               )}
                           </div>
 
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                                 Lebar ({el.width}px)
                               </span>
                               <input
@@ -5565,11 +7526,11 @@ export default function MapContainer({
                                     width: parseInt(e.target.value),
                                   })
                                 }
-                                className="w-full accent-sky-500 cursor-pointer"
+                                className="w-full accent-blue-500 cursor-pointer"
                               />
                             </div>
                             <div>
-                              <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                              <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                                 Tinggi ({el.height}px)
                               </span>
                               <input
@@ -5582,13 +7543,13 @@ export default function MapContainer({
                                     height: parseInt(e.target.value),
                                   })
                                 }
-                                className="w-full accent-sky-500 cursor-pointer"
+                                className="w-full accent-blue-500 cursor-pointer"
                               />
                             </div>
                           </div>
 
                           <div>
-                            <span className="block text-[10px] text-slate-400 font-mono font-bold uppercase mb-0.5">
+                            <span className="block text-[10px] text-slate-500 font-mono font-bold uppercase mb-0.5">
                               Rotasi ({el.rotation || 0}°)
                             </span>
                             <input
@@ -5601,7 +7562,7 @@ export default function MapContainer({
                                   rotation: parseInt(e.target.value),
                                 })
                               }
-                              className="w-full accent-sky-500 cursor-pointer"
+                              className="w-full accent-blue-500 cursor-pointer"
                             />
                           </div>
                         </div>
@@ -5612,7 +7573,7 @@ export default function MapContainer({
 
                 {/* List of current dynamic elements */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-mono">
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">
                     Daftar Objek Tambahan ({printLayoutElements.length})
                   </label>
                   <div className="max-h-24 overflow-y-auto flex flex-col gap-1 pr-1 scrollbar-thin text-xs font-mono">
@@ -5622,25 +7583,25 @@ export default function MapContainer({
                         onClick={() => setSelectedElementId(item.id)}
                         className={`flex justify-between items-center px-2 py-1.5 rounded border transition-all cursor-pointer ${
                           selectedElementId === item.id
-                            ? "bg-[#38bdf8]/10 border-[#38bdf8] text-white font-bold"
-                            : "bg-slate-900/60 border-[#334155]/60 text-slate-400 hover:text-slate-200"
+                            ? "bg-blue-50 border-blue-300 text-blue-800 font-bold"
+                            : "bg-white border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50"
                         }`}
                       >
                         <div className="flex items-center gap-1.5 truncate">
-                          <span className="text-[10px] font-mono text-slate-500">
+                          <span className="text-[10px] font-mono text-slate-400">
                             {idx + 1}.
                           </span>
                           {item.type === "text" && (
-                            <Type className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+                            <Type className="w-3.5 h-3.5 shrink-0 text-blue-500" />
                           )}
                           {item.type === "line" && (
-                            <Slash className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                            <Slash className="w-3.5 h-3.5 shrink-0 text-rose-500" />
                           )}
                           {item.type === "rectangle" && (
-                            <Square className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                            <Square className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
                           )}
                           {item.type === "image" && (
-                            <ImageIcon className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                            <ImageIcon className="w-3.5 h-3.5 shrink-0 text-amber-500" />
                           )}
                           <span className="truncate leading-none text-[11px]">
                             {item.type === "text"
@@ -5657,14 +7618,14 @@ export default function MapContainer({
                             if (selectedElementId === item.id)
                               setSelectedElementId(null);
                           }}
-                          className="text-slate-500 hover:text-red-400 p-0.5 rounded"
+                          className="text-slate-400 hover:text-red-500 p-0.5 rounded"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
                     {printLayoutElements.length === 0 && (
-                      <div className="text-center text-[10px] text-slate-500 italic py-2">
+                      <div className="text-center text-[10px] text-slate-400 italic py-2">
                         Belum ada objek tambahan.
                       </div>
                     )}
@@ -5674,11 +7635,11 @@ export default function MapContainer({
             )}
 
             {/* Control buttons */}
-            <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-[#334155]">
+            <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-slate-200">
               <button
                 onClick={handlePrintPDF}
                 disabled={!capturedMapUrl}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/40 disabled:cursor-not-allowed text-white font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-900/20"
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-bold font-mono rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-600/10"
               >
                 <Printer className="w-4 h-4" />
                 Cetak ke PDF / Printer
@@ -5686,7 +7647,7 @@ export default function MapContainer({
 
               <button
                 onClick={() => setPrintDialogOpen(false)}
-                className="w-full py-2 bg-[#1e293b] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-transparent font-bold font-mono rounded-lg text-xs transition-all cursor-pointer"
+                className="w-full py-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-200 font-bold font-mono rounded-lg text-xs transition-all cursor-pointer"
               >
                 Kembali ke Aplikasi
               </button>
@@ -5694,13 +7655,27 @@ export default function MapContainer({
           </div>
 
           {/* Right panel: Layout Preview Frame */}
-          <div className="flex-1 flex justify-center items-center p-4 bg-slate-900 border border-[#334155] rounded-xl overflow-hidden min-h-[500px]">
+          <div className="flex-1 flex justify-center items-center p-4 bg-slate-100 border border-slate-200 rounded-xl overflow-hidden min-h-[500px]">
             <div className="w-full max-w-4xl max-h-[85vh] overflow-auto flex items-center justify-center p-4 scrollbar-thin">
               {/* This mimics the paper. Handled nicely with aspect ratio constraints */}
               <div
                 id="print-layout-paper"
-                className={`bg-white text-black border-4 border-double border-black shadow-2xl flex ${
-                  printOrientation === "portrait" ? "flex-col" : "flex-row"
+                className={`${
+                  printTemplate === "default"
+                    ? "bg-white text-black border-4 border-double border-black p-[2px] "
+                    : printTemplate === "vintage_heritage"
+                    ? "bg-[#f4ebd0] "
+                    : printTemplate === "corporate_dashboard" || printTemplate === "storytelling_poster"
+                    ? "bg-[#020617] text-slate-100 "
+                    : printTemplate === "infographic_map"
+                    ? "bg-amber-50 text-slate-900 "
+                    : printTemplate === "magazine_spread"
+                    ? "bg-zinc-50 text-zinc-900 "
+                    : "bg-white text-black "
+                } shadow-2xl flex ${
+                  printTemplate === "default"
+                    ? (printOrientation === "portrait" ? "flex-col" : "flex-row")
+                    : "flex-col"
                 } gap-4 w-full ${
                   printOrientation === "landscape"
                     ? "aspect-[1.414]"
@@ -5711,448 +7686,409 @@ export default function MapContainer({
                   width: "100%",
                   boxSizing: "border-box",
                   margin: "2px",
-                  padding: "2px",
+                  padding: printTemplate === "default" ? "2px" : "0px",
                 }}
               >
-                {/* A. MAP FRAME SECTION */}
-                <div className="flex-[3] border-2 border-black relative flex items-center justify-center overflow-hidden bg-slate-50">
-                  {capturedMapUrl ? (
-                    <img
-                      src={capturedMapUrl}
-                      alt="Peta Spasial"
-                      className="w-full h-full object-cover"
-                      onError={() => {
-                        console.error(
-                          "Gagal memuat gambar peta yang ditangkap",
-                        );
-                        setCapturedMapUrl(null);
-                      }}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
-                      <div className="w-12 h-12 border-4 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
-                      <span className="text-sm font-mono font-bold text-slate-500">
-                        {isCapturing
-                          ? "Mengambil gambar peta..."
-                          : "Gagal menangkap peta. Silakan tutup dan coba lagi."}
-                      </span>
-                    </div>
-                  )}
+                {printTemplate === "default" ? (
+                  <>
+                    {/* A. MAP FRAME SECTION */}
+                    <div className="flex-[3] border-2 border-black relative flex items-center justify-center overflow-hidden bg-slate-50">
+                      {renderMapImage()}
 
-                  {/* Grid or Scale ticks overlay inside map frame for decoration */}
-                  {printProjection && (
-                    <div className="absolute top-2 left-2 bg-white/80 border border-black px-1.5 py-0.5 text-[8px] font-mono font-bold tracking-tight rounded pointer-events-none select-none text-black">
-                      {printProjection}
-                    </div>
-                  )}
-                  {/* Scale Bar */}
-
-                  {/* Creator / Source text */}
-                  <div className="absolute bottom-2 right-2 bg-white/80 border border-black px-2 py-1 text-[7px] font-mono font-bold rounded pointer-events-none select-none text-black max-w-[180px] text-right leading-tight">
-                    {printSourceText || "Sumber: Bappeda Banda Aceh"}
-                  </div>
-
-                  {/* Dynamic Print Layout Overlay Elements */}
-                  {printLayoutElements.map((el) => {
-                    const isSelected = el.id === selectedElementId;
-
-                    return (
-                      <div
-                        key={el.id}
-                        onMouseDown={(e) => startDrag(e, el.id)}
-                        onTouchStart={(e) => startTouchDrag(e, el.id)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedElementId(el.id);
-                        }}
-                        className={`absolute select-none cursor-move group transition-all duration-75 ${
-                          isSelected
-                            ? "ring-2 ring-sky-400 ring-offset-1 print:ring-0 print:ring-offset-0 z-50"
-                            : "hover:ring-1 hover:ring-slate-400 z-40"
-                        }`}
-                        style={{
-                          left: `${el.x}%`,
-                          top: `${el.y}%`,
-                          transform: "translate(-50%, -50%)",
-                          padding: "4px",
-                          borderRadius: "2px",
-                        }}
-                      >
-                        {/* Selector badge */}
-                        {isSelected && (
-                          <div className="absolute -top-2.5 -right-2.5 w-4 h-4 bg-sky-500 rounded-full border border-white flex items-center justify-center text-[8px] font-bold text-white print:hidden shadow-md">
-                            ✓
-                          </div>
-                        )}
-
-                        {el.type === "text" && (
-                          <div
-                            style={{
-                              fontSize: `${el.fontSize || 14}px`,
-                              color: el.fontColor || "#000000",
-                              fontWeight: "bold",
-                              whiteSpace: "nowrap",
-                              fontFamily: "var(--font-sans)",
-                            }}
-                          >
-                            {el.content}
-                          </div>
-                        )}
-
-                        {el.type === "line" && (
-                          <div
-                            style={{
-                              width: `${el.width || 100}px`,
-                              height: `${el.lineWidth || 2}px`,
-                              backgroundColor: el.lineColor || "#ff0000",
-                              transform: `rotate(${el.rotation || 0}deg)`,
-                              transformOrigin: "center",
-                            }}
-                          />
-                        )}
-
-                        {el.type === "rectangle" && (
-                          <div
-                            style={{
-                              width: `${el.width || 120}px`,
-                              height: `${el.height || 60}px`,
-                              backgroundColor:
-                                el.rectFillColor || "rgba(255,255,255,0.7)",
-                              border: `${el.rectBorderWidth === undefined ? 2 : el.rectBorderWidth}px solid ${el.rectBorderColor || "#000000"}`,
-                            }}
-                          />
-                        )}
-
-                        {el.type === "image" && el.imageUrl && (
-                          <img
-                            src={el.imageUrl}
-                            alt="Overlay element"
-                            referrerPolicy="no-referrer"
-                            style={{
-                              width: `${el.width || 60}px`,
-                              height: `${el.height || 60}px`,
-                              transform: `rotate(${el.rotation || 0}deg)`,
-                              transformOrigin: "center",
-                              objectFit: "contain",
-                            }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* B. KOP KARTOGRAFI SECTION (Title block & legend) */}
-                {printOrientation === "landscape" ? (
-                  /* Vertical Kop Layout for Landscape Orientation */
-                  <div className="flex-[1] border-2 border-black p-3.5 flex flex-col justify-between text-black bg-white select-none overflow-hidden max-w-[280px]">
-                    <div className="flex flex-col gap-2.5">
-                      {/* Logo & Agency Info */}
-                      <div className="text-center border-b-2 border-black pb-2 flex flex-col items-center justify-center gap-1">
-                        {printLogo ? (
-                          <img
-                            src={printLogo}
-                            alt="Logo Instansi"
-                            className="w-10 h-10 object-contain border border-black rounded"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-xs">
-                            SIG
-                          </div>
-                        )}
-                        <div className="leading-tight">
-                          <h4 className="font-sans font-extrabold text-[9px] tracking-wider">
-                            {printGovernmentName}
-                          </h4>
-                          <h4 className="font-sans font-extrabold text-[10px] tracking-wider uppercase">
-                            {printRegionName}
-                          </h4>
-                          <p className="text-[7px] text-slate-600 font-medium font-mono leading-none mt-0.5">
-                            {printProvinceName}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Map Title & Subtitle block */}
-                      <div className="border-b-2 border-black pb-2">
-                        <h2 className="font-sans font-extrabold text-xs tracking-wide uppercase leading-tight text-center">
-                          {printTitle || "PETA SPASIAL KOTA"}
-                        </h2>
-                        <p className="text-[8px] font-mono mt-1 text-center font-medium leading-normal text-slate-700">
-                          {printSubtitle ||
-                            "Badan Perencanaan Pembangunan Daerah"}
-                        </p>
-                      </div>
-
-                      {/* Compass Block */}
-                      {printShowCompass && (
-                        <div className="border-b-2 border-black pb-2.5 flex justify-center items-center gap-4 py-1">
-                          <div className="flex flex-col items-center">
-                            <svg
-                              width="24px"
-                              height="24px"
-                              viewBox="0 0 100 100"
-                              xmlns="http://www.w3.org/2000/svg"
-                              aria-hidden="true"
-                              role="img"
-                              className="iconify iconify--gis"
-                              preserveAspectRatio="xMidYMid meet"
-                              fill="#000000"
-                            >
-                              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-                              <g
-                                id="SVGRepo_tracerCarrier"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              ></g>
-                              <g id="SVGRepo_iconCarrier">
-                                <path
-                                  d="M42.066 0v20h3.752V6.957L53.881 20h4.053V0h-3.752v13.355L45.996 0zm5.57 26.688l-25.77 69.949c-.823 2.238 1.658 4.248 3.677 2.978L50 84.195l24.455 15.42c2.02 1.273 4.504-.738 3.68-2.978l-25.79-70c-.472-1.096-1.283-1.632-2.384-1.635c-1.1-.003-2.017.856-2.324 1.686zm-.136 14.83V79.86L29.1 91.463z"
-                                  fill="#000000"
-                                  fillRule="evenodd"
-                                ></path>
-                              </g>
-                            </svg>
-                            <span className="text-[7px] font-bold mt-0.5 font-mono">
-                              ARAH UTARA
-                            </span>
-                            <span className="text-[10px] mt-0.5 font-mono">
-                              Skala: {printScaleText || "1:25.000"}
-                            </span>
-                          </div>
+                      {/* Grid or Scale ticks overlay inside map frame for decoration */}
+                      {printProjection && (
+                        <div className="absolute top-2 left-2 bg-white/80 border border-black px-1.5 py-0.5 text-[8px] font-mono font-bold tracking-tight rounded pointer-events-none select-none text-black">
+                          {printProjection}
                         </div>
                       )}
+                      {/* Scale Bar */}
 
-                      {/* Dynamic Legend Block */}
-                      {printShowLegend && (
-                        <div className="flex flex-col gap-1.5 border-b-2 border-black pb-2.5">
-                          <h5 className="font-bold text-[9px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">
-                            LEGENDA PETA
-                          </h5>
-                          <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
-                            {/* Standard Layers */}
-
-                            {/* Dynamic Active Layers from Application */}
-                            {layers
-                              .filter((l) => l.visible)
-                              .map((l) => (
-                                <div
-                                  key={l.id}
-                                  className="flex items-center gap-2 text-[9px]"
-                                >
-                                  {l.type === "fill" && (
-                                    <div
-                                      className="w-4 h-2.5 border border-black"
-                                      style={{
-                                        backgroundColor: l.color || "#94a3b8",
-                                      }}
-                                    />
-                                  )}
-                                  {l.type === "line" && (
-                                    <div
-                                      className="w-4 h-0.5"
-                                      style={{
-                                        backgroundColor: l.color || "#ef4444",
-                                      }}
-                                    />
-                                  )}
-                                  {l.type === "circle" && (
-                                    <div
-                                      className="w-2.5 h-2.5 rounded-full border border-black"
-                                      style={{
-                                        backgroundColor: l.color || "#3b82f6",
-                                      }}
-                                    />
-                                  )}
-                                  <span className="font-mono text-[8px] truncate leading-tight capitalize">
-                                    {l.name}
-                                  </span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Footer metadata block */}
-                    <div className="border-t-2 border-black pt-2 text-[7px] font-mono text-slate-500 flex flex-col gap-0.5">
-                      <div className="truncate">
+                      {/* Creator / Source text */}
+                      <div className="absolute bottom-2 right-2 bg-white/80 border border-black px-2 py-1 text-[7px] font-mono font-bold rounded pointer-events-none select-none text-black max-w-[180px] text-right leading-tight">
                         {printSourceText || "Sumber: Bappeda Banda Aceh"}
                       </div>
 
-                      <div className="truncate">
-                        Tanggal Cetak:{" "}
-                        {new Date().toLocaleDateString("id-ID", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </div>
-                      <div className="font-bold text-[6px] tracking-wider uppercase border-t border-slate-200 mt-1 pt-0.5 truncate">
-                        KARTOGRAFER: {printCartographer}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* Horizontal Kop Layout for Portrait Orientation */
-                  <div className="border-2 border-black p-3 flex flex-row justify-between gap-4 text-black bg-white select-none text-left">
-                    {/* Col 1: Logo, Title & Subtitle */}
-                    <div className="flex-1 flex flex-col gap-1.5 pr-2 border-r border-slate-300">
-                      <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
-                        {printLogo ? (
-                          <img
-                            src={printLogo}
-                            alt="Logo Instansi"
-                            className="w-7 h-7 object-contain border border-black rounded"
-                          />
-                        ) : (
-                          <div className="w-7 h-7 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-[10px]">
-                            SIG
-                          </div>
-                        )}
-                        <div className="leading-tight">
-                          <h4 className="font-sans font-extrabold text-[8px] uppercase tracking-wider leading-none">
-                            {printGovernmentName}
-                          </h4>
-                          <h4 className="font-sans font-extrabold text-[9px] uppercase tracking-wider leading-tight">
-                            {printRegionName}
-                          </h4>
-                        </div>
-                      </div>
-                      <h2 className="font-sans font-extrabold text-[10px] tracking-wide uppercase leading-tight">
-                        {printTitle || "PETA SPASIAL KOTA"}
-                      </h2>
-                      <p className="text-[7px] font-mono leading-tight text-slate-700">
-                        {printSubtitle ||
-                          "Badan Perencanaan Pembangunan Daerah"}
-                      </p>
-                    </div>
+                      {/* Dynamic Print Layout Overlay Elements */}
+                      {printLayoutElements.map((el) => {
+                        const isSelected = el.id === selectedElementId;
 
-                    {/* Col 2: Legend Panel */}
-                    {printShowLegend ? (
-                      <div className="flex-1 px-2 border-r border-slate-300 flex flex-col gap-1">
-                        <h5 className="font-bold text-[8px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">
-                          LEGENDA
-                        </h5>
-                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 max-h-[70px] overflow-y-auto pr-1">
-                          <div className="flex items-center gap-1 text-[8px]">
-                            <div className="w-3 h-2 border border-black bg-emerald-500/10 shrink-0" />
-                            <span className="font-mono text-[7px] leading-tight truncate">
-                              Batas Kecamatan
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[8px]">
-                            <div className="w-3 h-0.5 bg-red-500 shrink-0" />
-                            <span className="font-mono text-[7px] leading-tight truncate">
-                              Jalan Kota
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[8px]">
-                            <div className="w-3 h-0.5 bg-blue-500 shrink-0" />
-                            <span className="font-mono text-[7px] leading-tight truncate">
-                              Aliran Sungai
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[8px]">
-                            <div className="w-2 h-2 rounded-full bg-amber-500 border border-black shrink-0" />
-                            <span className="font-mono text-[7px] leading-tight truncate">
-                              Landmark Kota
-                            </span>
-                          </div>
+                        return (
+                          <div
+                            key={el.id}
+                            onMouseDown={(e) => startDrag(e, el.id)}
+                            onTouchStart={(e) => startTouchDrag(e, el.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedElementId(el.id);
+                            }}
+                            className={`absolute select-none cursor-move group transition-all duration-75 ${
+                              isSelected
+                                ? "ring-2 ring-sky-400 ring-offset-1 print:ring-0 print:ring-offset-0 z-50"
+                                : "hover:ring-1 hover:ring-slate-400 z-40"
+                            }`}
+                            style={{
+                              left: `${el.x}%`,
+                              top: `${el.y}%`,
+                              transform: "translate(-50%, -50%)",
+                              padding: "4px",
+                              borderRadius: "2px",
+                            }}
+                          >
+                            {/* Selector badge */}
+                            {isSelected && (
+                              <div className="absolute -top-2.5 -right-2.5 w-4 h-4 bg-sky-500 rounded-full border border-white flex items-center justify-center text-[8px] font-bold text-white print:hidden shadow-md">
+                                ✓
+                              </div>
+                            )}
 
-                          {layers
-                            .filter((l) => l.visible)
-                            .map((l) => (
+                            {el.type === "text" && (
                               <div
-                                key={l.id}
-                                className="flex items-center gap-1 text-[8px]"
+                                style={{
+                                  fontSize: `${el.fontSize || 14}px`,
+                                  color: el.fontColor || "#000000",
+                                  fontWeight: "bold",
+                                  whiteSpace: "nowrap",
+                                  fontFamily: "var(--font-sans)",
+                                  transform: `rotate(${el.rotation || 0}deg)`,
+                                  transformOrigin: "center",
+                                }}
                               >
-                                {l.type === "fill" && (
-                                  <div
-                                    className="w-3 h-2 border border-black shrink-0"
-                                    style={{
-                                      backgroundColor: l.color || "#94a3b8",
-                                    }}
-                                  />
-                                )}
-                                {l.type === "line" && (
-                                  <div
-                                    className="w-3 h-0.5 shrink-0"
-                                    style={{
-                                      backgroundColor: l.color || "#ef4444",
-                                    }}
-                                  />
-                                )}
-                                {l.type === "circle" && (
-                                  <div
-                                    className="w-2 h-2 rounded-full border border-black shrink-0"
-                                    style={{
-                                      backgroundColor: l.color || "#3b82f6",
-                                    }}
-                                  />
-                                )}
-                                <span className="font-mono text-[7px] truncate leading-tight capitalize shrink-0">
-                                  {l.name}
+                                {el.content}
+                              </div>
+                            )}
+
+                            {el.type === "line" && (
+                              <div
+                                style={{
+                                  width: `${el.width || 100}px`,
+                                  height: `${el.lineWidth || 2}px`,
+                                  backgroundColor: el.lineColor || "#ff0000",
+                                  transform: `rotate(${el.rotation || 0}deg)`,
+                                  transformOrigin: "center",
+                                }}
+                              />
+                            )}
+
+                             {el.type === "rectangle" && (
+                              <div
+                                style={{
+                                  width: `${el.width || 120}px`,
+                                  height: `${el.height || 60}px`,
+                                  backgroundColor:
+                                    el.rectFillColor || "rgba(255,255,255,0.7)",
+                                  border: `${el.rectBorderWidth === undefined ? 2 : el.rectBorderWidth}px solid ${el.rectBorderColor || "#000000"}`,
+                                  transform: `rotate(${el.rotation || 0}deg)`,
+                                  transformOrigin: "center",
+                                }}
+                              />
+                            )}
+
+                            {el.type === "image" && el.imageUrl && (
+                              <img
+                                src={el.imageUrl}
+                                alt="Overlay element"
+                                referrerPolicy="no-referrer"
+                                style={{
+                                  width: `${el.width || 60}px`,
+                                  height: `${el.height || 60}px`,
+                                  transform: `rotate(${el.rotation || 0}deg)`,
+                                  transformOrigin: "center",
+                                  objectFit: "contain",
+                                }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* B. KOP KARTOGRAFI SECTION (Title block & legend) */}
+                    {printOrientation === "landscape" ? (
+                      /* Vertical Kop Layout for Landscape Orientation */
+                      <div className="flex-[1] border-2 border-black p-3.5 flex flex-col justify-between text-black bg-white select-none overflow-hidden max-w-[280px]">
+                        <div className="flex flex-col gap-2.5">
+                          {/* Logo & Agency Info */}
+                          <div className="text-center border-b-2 border-black pb-2 flex flex-col items-center justify-center gap-1">
+                            {printLogo ? (
+                              <img
+                                src={printLogo}
+                                alt="Logo Instansi"
+                                className="w-10 h-10 object-contain border border-black rounded"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-xs">
+                                SIG
+                              </div>
+                            )}
+                            <div className="leading-tight">
+                              <h4 className="font-sans font-extrabold text-[9px] tracking-wider">
+                                {printGovernmentName}
+                              </h4>
+                              <h4 className="font-sans font-extrabold text-[10px] tracking-wider uppercase">
+                                {printRegionName}
+                              </h4>
+                              <p className="text-[7px] text-slate-600 font-medium font-mono leading-none mt-0.5">
+                                {printProvinceName}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Map Title & Subtitle block */}
+                          <div className="border-b-2 border-black pb-2">
+                            <h2 className="font-sans font-extrabold text-xs tracking-wide uppercase leading-tight text-center">
+                              {printTitle || "PETA SPASIAL KOTA"}
+                            </h2>
+                            <p className="text-[8px] font-mono mt-1 text-center font-medium leading-normal text-slate-700">
+                              {printSubtitle ||
+                                "Badan Perencanaan Pembangunan Daerah"}
+                            </p>
+                          </div>
+
+                          {/* Compass Block */}
+                          {printShowCompass && (
+                            <div className="border-b-2 border-black pb-2.5 flex justify-center items-center gap-4 py-1">
+                              <div className="flex flex-col items-center">
+                                <svg
+                                  width="24px"
+                                  height="24px"
+                                  viewBox="0 0 100 100"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  aria-hidden="true"
+                                  role="img"
+                                  className="iconify iconify--gis"
+                                  preserveAspectRatio="xMidYMid meet"
+                                  fill="#000000"
+                                >
+                                  <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
+                                  <g
+                                    id="SVGRepo_tracerCarrier"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  ></g>
+                                  <g id="SVGRepo_iconCarrier">
+                                    <path
+                                      d="M42.066 0v20h3.752V6.957L53.881 20h4.053V0h-3.752v13.355L45.996 0zm5.57 26.688l-25.77 69.949c-.823 2.238 1.658 4.248 3.677 2.978L50 84.195l24.455 15.42c2.02 1.273 4.504-.738 3.68-2.978l-25.79-70c-.472-1.096-1.283-1.632-2.384-1.635c-1.1-.003-2.017.856-2.324 1.686zm-.136 14.83V79.86L29.1 91.463z"
+                                      fill="#000000"
+                                      fillRule="evenodd"
+                                    ></path>
+                                  </g>
+                                </svg>
+                                <span className="text-[7px] font-bold mt-0.5 font-mono">
+                                  ARAH UTARA
+                                </span>
+                                <span className="text-[10px] mt-0.5 font-mono">
+                                  Skala: {printScaleText || "1:25.000"}
                                 </span>
                               </div>
-                            ))}
+                            </div>
+                          )}
+
+                          {/* Dynamic Legend Block */}
+                          {printShowLegend && (
+                            <div className="flex flex-col gap-1.5 border-b-2 border-black pb-2.5">
+                              <h5 className="font-bold text-[9px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">
+                                {printLegendTitle}
+                              </h5>
+                              <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
+                                {layers
+                                  .filter((l) => l.visible)
+                                  .map((l) => (
+                                    <div
+                                      key={l.id}
+                                      className="flex items-center gap-2 text-[9px]"
+                                    >
+                                      {l.type === "fill" && (
+                                        <div
+                                          className="w-4 h-2.5 border border-black"
+                                          style={{
+                                            backgroundColor: l.color || "#94a3b8",
+                                          }}
+                                        />
+                                      )}
+                                      {l.type === "line" && (
+                                        <div
+                                          className="w-4 h-0.5"
+                                          style={{
+                                            backgroundColor: l.color || "#ef4444",
+                                          }}
+                                        />
+                                      )}
+                                      {l.type === "circle" && (
+                                        <div
+                                          className="w-2.5 h-2.5 rounded-full border border-black"
+                                          style={{
+                                            backgroundColor: l.color || "#3b82f6",
+                                          }}
+                                        />
+                                      )}
+                                      <span className="font-mono text-[8px] truncate leading-tight capitalize">
+                                        {printLayerLegendNames[l.id] !== undefined ? printLayerLegendNames[l.id] : l.name}
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Footer metadata block */}
+                        <div className="border-t-2 border-black pt-2 text-[7px] font-mono text-slate-500 flex flex-col gap-0.5">
+                          <div className="truncate">
+                            {printSourceText || "Sumber: Bappeda Banda Aceh"}
+                          </div>
+
+                          <div className="truncate">
+                            Tanggal Cetak:{" "}
+                            {new Date().toLocaleDateString("id-ID", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </div>
+                          <div className="font-bold text-[6px] tracking-wider uppercase border-t border-slate-200 mt-1 pt-0.5 truncate">
+                            KARTOGRAFER: {printCartographer}
+                          </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex-1 px-2 border-r border-slate-300 flex flex-col justify-center items-center text-slate-400 font-mono text-[8px]">
-                        Legenda Dinonaktifkan
-                      </div>
-                    )}
+                      /* Horizontal Kop Layout for Portrait Orientation */
+                      <div className="border-2 border-black p-3 flex flex-row justify-between gap-4 text-black bg-white select-none text-left w-full">
+                        {/* Col 1: Logo, Title & Subtitle */}
+                        <div className="flex-1 flex flex-col gap-1.5 pr-2 border-r border-slate-300">
+                          <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
+                            {printLogo ? (
+                              <img
+                                src={printLogo}
+                                alt="Logo Instansi"
+                                className="w-7 h-7 object-contain border border-black rounded"
+                              />
+                            ) : (
+                              <div className="w-7 h-7 border border-black flex items-center justify-center rounded bg-slate-100 font-bold text-[10px]">
+                                SIG
+                              </div>
+                            )}
+                            <div className="leading-tight">
+                              <h4 className="font-sans font-extrabold text-[8px] uppercase tracking-wider leading-none">
+                                {printGovernmentName}
+                              </h4>
+                              <h4 className="font-sans font-extrabold text-[9px] uppercase tracking-wider leading-tight">
+                                {printRegionName}
+                              </h4>
+                            </div>
+                          </div>
+                          <h2 className="font-sans font-extrabold text-[10px] tracking-wide uppercase leading-tight">
+                            {printTitle || "PETA SPASIAL KOTA"}
+                          </h2>
+                          <p className="text-[7px] font-mono leading-tight text-slate-700">
+                            {printSubtitle ||
+                              "Badan Perencanaan Pembangunan Daerah"}
+                          </p>
+                        </div>
 
-                    {/* Col 3: Compass, Scale, Metadata */}
-                    <div className="flex-1 pl-2 flex flex-row items-center justify-between gap-2">
-                      <div className="flex flex-col items-center justify-center shrink-0">
-                        {printShowCompass ? (
-                          <div className="flex flex-col items-center justify-center">
-                            <svg
-                              width="24px"
-                              height="24px"
-                              viewBox="0 0 100 100"
-                              xmlns="http://www.w3.org/2000/svg"
-                              aria-hidden="true"
-                              role="img"
-                              className="iconify iconify--gis"
-                              preserveAspectRatio="xMidYMid meet"
-                              fill="#000000"
-                            >
-                              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-                              <g
-                                id="SVGRepo_tracerCarrier"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              ></g>
-                              <g id="SVGRepo_iconCarrier">
-                                <path
-                                  d="M42.066 0v20h3.752V6.957L53.881 20h4.053V0h-3.752v13.355L45.996 0zm5.57 26.688l-25.77 69.949c-.823 2.238 1.658 4.248 3.677 2.978L50 84.195l24.455 15.42c2.02 1.273 4.504-.738 3.68-2.978l-25.79-70c-.472-1.096-1.283-1.632-2.384-1.635c-1.1-.003-2.017.856-2.324 1.686zm-.136 14.83V79.86L29.1 91.463z"
-                                  fill="#000000"
-                                  fillRule="evenodd"
-                                ></path>
-                              </g>
-                            </svg>
-                            <span className="text-[6px] font-bold mt-0.5 font-mono">
-                              ARAH UTARA
-                            </span>
+                        {/* Col 2: Legend Panel */}
+                        {printShowLegend ? (
+                          <div className="flex-1 px-2 border-r border-slate-300 flex flex-col gap-1">
+                            <h5 className="font-bold text-[8px] uppercase font-mono tracking-wider border-b border-slate-300 pb-0.5">
+                              {printLegendTitle}
+                            </h5>
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-1 max-h-[70px] overflow-y-auto pr-1">
+                              {layers
+                                .filter((l) => l.visible)
+                                .map((l) => (
+                                  <div
+                                    key={l.id}
+                                    className="flex items-center gap-1 text-[8px]"
+                                  >
+                                    {l.type === "fill" && (
+                                      <div
+                                        className="w-3 h-2 border border-black shrink-0"
+                                        style={{
+                                          backgroundColor: l.color || "#94a3b8",
+                                        }}
+                                      />
+                                    )}
+                                    {l.type === "line" && (
+                                      <div
+                                        className="w-3 h-0.5 shrink-0"
+                                        style={{
+                                          backgroundColor: l.color || "#ef4444",
+                                        }}
+                                      />
+                                    )}
+                                    {l.type === "circle" && (
+                                      <div
+                                        className="w-2 h-2 rounded-full border border-black shrink-0"
+                                        style={{
+                                          backgroundColor: l.color || "#3b82f6",
+                                        }}
+                                      />
+                                    )}
+                                    <span className="font-mono text-[7px] truncate leading-tight capitalize shrink-0">
+                                      {printLayerLegendNames[l.id] !== undefined ? printLayerLegendNames[l.id] : l.name}
+                                    </span>
+                                  </div>
+                                ))}
+                            </div>
                           </div>
                         ) : (
-                          <div className="h-7" />
+                          <div className="flex-1 px-2 border-r border-slate-300 flex flex-col justify-center items-center text-slate-400 font-mono text-[8px]">
+                            Legenda Dinonaktifkan
+                          </div>
                         )}
-                      </div>
-                      <div className="text-[7px] font-mono leading-snug text-slate-600 flex flex-col justify-center min-w-0">
-                        <div className="truncate">Datum: {printDatum}</div>
-                        <div className="truncate">
-                          {printSourceText || "Sumber: Bappeda Banda Aceh"}
+
+                        {/* Col 3: Compass, Scale, Metadata */}
+                        <div className="flex-1 pl-2 flex flex-row items-center justify-between gap-2">
+                          <div className="flex flex-col items-center justify-center shrink-0">
+                            {printShowCompass ? (
+                              <div className="flex flex-col items-center justify-center">
+                                <svg
+                                  width="24px"
+                                  height="24px"
+                                  viewBox="0 0 100 100"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  aria-hidden="true"
+                                  role="img"
+                                  className="iconify iconify--gis"
+                                  preserveAspectRatio="xMidYMid meet"
+                                  fill="#000000"
+                                >
+                                  <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
+                                  <g
+                                    id="SVGRepo_tracerCarrier"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  ></g>
+                                  <g id="SVGRepo_iconCarrier">
+                                    <path
+                                      d="M42.066 0v20h3.752V6.957L53.881 20h4.053V0h-3.752v13.355L45.996 0zm5.57 26.688l-25.77 69.949c-.823 2.238 1.658 4.248 3.677 2.978L50 84.195l24.455 15.42c2.02 1.273 4.504-.738 3.68-2.978l-25.79-70c-.472-1.096-1.283-1.632-2.384-1.635c-1.1-.003-2.017.856-2.324 1.686zm-.136 14.83V79.86L29.1 91.463z"
+                                      fill="#000000"
+                                      fillRule="evenodd"
+                                    ></path>
+                                  </g>
+                                </svg>
+                                <span className="text-[6px] font-bold mt-0.5 font-mono">
+                                  ARAH UTARA
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="h-7" />
+                            )}
+                          </div>
+                          <div className="text-[7px] font-mono leading-snug text-slate-600 flex flex-col justify-center min-w-0">
+                            <div className="truncate">Datum: {printDatum}</div>
+                            <div className="truncate">
+                              {printSourceText || "Sumber: Bappeda Banda Aceh"}
+                            </div>
+                            <div className="truncate font-bold text-[6px] text-black border-t border-slate-200 mt-0.5 pt-0.5">
+                              KTR: {printCartographer}
+                            </div>
+                          </div>
                         </div>
-                        <div className="truncate font-bold text-[6px] text-black border-t border-slate-200 mt-0.5 pt-0.5">
-                          KTR: {printCartographer}
-                        </div>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
+                ) : (
+                  renderTemplateContent()
                 )}
               </div>
             </div>
